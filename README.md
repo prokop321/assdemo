@@ -7,11 +7,15 @@ simulated unix-like OS instead of a real Mac. No real files are touched.
 file `dist/asscat-demo.html` (`node build.js` regenerates it, plus `dist/artifact.html` for claude.ai).
 
 - left: terminal (`help`, `asscat help`, `demo`, `selftest`), Tab completion, ↑/↓ history
+- under it: a command builder. Pick a command, fill its fields (paths, tag keys/values, views and disks
+  are suggested), and **Run** sends exactly the command line shown, as if typed. "↓ to prompt" copies it
+  into the text prompt for hand editing
 - right: an independent Finder-like browser on the same disks (drag to move, double-click to edit,
   plug in / eject disks)
 - state is kept in the browser's localStorage; `reset` starts over
 
-**Tests:** `node tests/run.js [n]` runs the 22 acceptance scenarios from spec ch. 10 (also `selftest`
+**Tests:** `node tests/builder.js` checks that every builder command composes to the right shell line.
+`node tests/run.js [n]` runs the 22 acceptance scenarios from spec ch. 10 (also `selftest`
 in the browser). `node tests/demos.js [name]` prints a transcript of the guided demos.
 
 ## Layout
@@ -23,6 +27,7 @@ in the browser). `node tests/demos.js [name]` prints a transcript of the guided 
 | `src/shell.js` | shell: `ls cd tree mv cp rm mkdir touch chmod ln cat stat find`, `disk`, `clock`, `tz`, `holdlock`, `genphotos`… |
 | `src/demos.js` | six guided walkthroughs (`demo tour`, `edits`, `card`, `views`, `crash`, `limits`; run in that order) |
 | `src/selftest.js` | the spec's acceptance tests |
+| `src/builder.js` | command builder: catalogue of commands and their parameters, quoting |
 | `src/ui.js`, `index.html` | browser UI |
 
 ## What the simulation simplifies

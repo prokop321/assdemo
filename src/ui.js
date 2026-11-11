@@ -70,6 +70,15 @@
     if (/\s/.test(full)) full = '"' + full + (isDir ? '/' : '"'); else if (isDir) full += '/';
     input.value = v.slice(0, v.length - m[1].length) + full;
   }
+  // path suggestions for the builder: entries of the folder typed so far
+  function completePath(typed) {
+    const dirPart = typed.includes('/') ? typed.slice(0, typed.lastIndexOf('/') + 1) : '';
+    let names; try { names = k.readdir(sh.path(dirPart || '.')); } catch { return []; }
+    return names.filter(n => !n.startsWith('.') || typed.slice(dirPart.length).startsWith('.')).map(n => {
+      let dir = false; try { dir = k.stat(sh.path(dirPart + n)).type === 'dir'; } catch { /* ignore */ }
+      return dirPart + n + (dir ? '/' : '');
+    });
+  }
   input.addEventListener('keydown', e => {
     if (e.key === 'Enter') {
       e.preventDefault();
@@ -243,8 +252,14 @@
   function welcome() {
     print('Asscat demo on a mock unix-like OS. Nothing here touches your real disk; state lives in this browser tab (localStorage).', 'note');
     print('Type "help" for shell commands, "asscat help" for the app, "demo" for guided walkthroughs (run them in order), "selftest" for the spec\'s 22 acceptance tests.', 'note');
+    print('Below the output is a command builder: pick a command, fill the fields, Run. It sends exactly the line shown, same as typing it.', 'note');
     print('The right pane is an independent file browser: drag rows onto folders to move, double-click a file to edit it, plug in disks in the sidebar.', 'note');
   }
+  window.Builder.mount($('builder'), {
+    k: () => k, completePath,
+    run: line => { hist.push(line); hi = hist.length; runLine(line); },
+    toPrompt: line => { input.value = line; input.focus(); },
+  });
   const restored = boot(false);
   welcome();
   if (restored) print('(restored previous state — "reset" to start over)', 'err');

@@ -9,8 +9,8 @@
 
   // tokenizer: quotes, backslash escapes, operators ; && > >>
   function tokenize(line) {
-    const out = []; let cur = null, i = 0, quoted = false;
-    const push = () => { if (cur !== null) out.push({ w: cur, q: quoted }); cur = null; quoted = false; };
+    const out = []; let cur = null, i = 0, quoted = false, tilde = false;
+    const push = () => { if (cur !== null) out.push({ w: cur, q: quoted, tilde }); cur = null; quoted = false; tilde = false; };
     while (i < line.length) {
       const c = line[i];
       if (c === '#' && cur === null) break;
@@ -28,6 +28,7 @@
         i++; continue;
       }
       if (c === '\\' && i + 1 < line.length) { cur = (cur ?? '') + line[i + 1]; i += 2; continue; }
+      if (c === '~' && cur === null) tilde = true;        // unquoted leading ~ expands to $HOME
       cur = (cur ?? '') + c; i++;
     }
     push();
@@ -68,7 +69,7 @@ ui        clear   reset   (state is saved in this browser's localStorage)`;
         const t = toks[i];
         if (t.op === ';' || t.op === '&&') { cmds.push(cur); cur = { argv: [], redir: null, sep: t.op }; continue; }
         if (t.op === '>' || t.op === '>>') { const f = toks[++i]; if (!f || f.op) { this.err('sh: missing file after ' + t.op); return 2; } cur.redir = { mode: t.op, file: f.w }; continue; }
-        cur.argv.push(t.q ? t.w : t.w);
+        cur.argv.push(t.tilde && (t.w === '~' || t.w.startsWith('~/')) ? HOME + t.w.slice(1) : t.w);
       }
       cmds.push(cur);
       let code = 0;
