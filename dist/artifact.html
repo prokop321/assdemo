@@ -2888,7 +2888,11 @@ ui        clear   reset   (state is saved in this browser's localStorage)`;
     else if (e.key === 'Tab') { e.preventDefault(); complete(); }
     else if (e.key === 'l' && e.ctrlKey) { e.preventDefault(); out.textContent = ''; }
   });
-  $('term').addEventListener('click', () => { if (!window.getSelection().toString()) input.focus(); });
+  // clicking the output focuses the prompt; never steal focus from the builder's controls (it closed their dropdowns)
+  $('term').addEventListener('click', e => {
+    if (e.target.closest('#builder, input, select, button, label, textarea')) return;
+    if (!window.getSelection().toString()) input.focus();
+  });
 
   // ---------- in-page dialogs (the artifact viewer blocks prompt/confirm) ----------
   // fields: [{id, label, value, type:'text'|'select'|'checkbox', options}] -> Promise<values|null>
