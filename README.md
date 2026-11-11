@@ -4,7 +4,7 @@ Browser demo of `asscat-cli` as described in `asscat-demo-spec` (stav 2026-11-11
 simulated unix-like OS instead of a real Mac. No real files are touched.
 
 **Run:** open `index.html` in a browser (works from `file://`, no server, no build), or use the single
-file `dist/asscat-demo.html` (`node build.js` regenerates it).
+file `dist/asscat-demo.html` (`node build.js` regenerates it, plus `dist/artifact.html` for claude.ai).
 
 - left: terminal (`help`, `asscat help`, `demo`, `selftest`), Tab completion, ↑/↓ history
 - right: an independent Finder-like browser on the same disks (drag to move, double-click to edit,

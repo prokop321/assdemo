@@ -12,17 +12,17 @@
   @media (prefers-color-scheme: dark) {
     :root:not([data-theme="light"]) {
       --bg: #121316; --panel: #1b1d22; --line: #30333a; --text: #e6e7ea; --muted: #9a9ea8;
-      --accent: #7fb0ff; --sel: #26365a; --err: #ff8a80; --term-bg: #0d0e11; --term-text: #e4e6eb; --term-muted: #8a909c; --term-accent: #7fb0ff;
+      --accent: #7fb0ff; --sel: #26365a; --err: #ff8a80; --term-bg: #0d0e11; --term-text: #e4e6eb; --term-muted: #8a909c; --term-accent: #7fb0ff; color-scheme: dark;
     }
   }
   :root[data-theme="dark"] {
     --bg: #121316; --panel: #1b1d22; --line: #30333a; --text: #e6e7ea; --muted: #9a9ea8;
-    --accent: #7fb0ff; --sel: #26365a; --err: #ff8a80; --term-bg: #0d0e11; --term-text: #e4e6eb; --term-muted: #8a909c; --term-accent: #7fb0ff;
+    --accent: #7fb0ff; --sel: #26365a; --err: #ff8a80; --term-bg: #0d0e11; --term-text: #e4e6eb; --term-muted: #8a909c; --term-accent: #7fb0ff; color-scheme: dark;
   }
   * { box-sizing: border-box; }
   html, body { margin: 0; height: 100%; }
   body { background: var(--bg); color: var(--text); font: 13px/1.4 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; display: flex; flex-direction: column; }
-  header { display: flex; gap: 12px; align-items: center; padding: 6px 12px; border-bottom: 1px solid var(--line); flex-wrap: wrap; }
+  header { display: flex; gap: 12px; align-items: center; padding: 6px 16px; border-bottom: 1px solid var(--line); flex-wrap: wrap; }
   header b { font-size: 14px; }
   header .sp { flex: 1; }
   header .clock { color: var(--muted); font-variant-numeric: tabular-nums; }
@@ -60,6 +60,10 @@
   #fstat { padding: 4px 8px; border-top: 1px solid var(--line); color: var(--muted); min-height: 24px; }
   #fstat.bad { color: var(--err); }
   dialog { border: 1px solid var(--line); border-radius: 8px; background: var(--panel); color: var(--text); width: min(640px, 92vw); }
+  dialog input[type=text], dialog select { font: inherit; width: 100%; padding: 4px 6px; background: var(--bg); color: var(--text); border: 1px solid var(--line); border-radius: 4px; }
+  #askBody { display: flex; flex-direction: column; gap: 8px; }
+  #askBody label { display: flex; flex-direction: column; gap: 2px; color: var(--muted); }
+  #askBody label.cb { flex-direction: row; gap: 6px; color: var(--text); }
   dialog textarea { width: 100%; height: 50vh; font: 12px ui-monospace, Menlo, monospace; background: var(--bg); color: var(--text); border: 1px solid var(--line); }
   @media (max-width: 760px) { main { flex-direction: column; } #finder { border-left: 0; border-top: 1px solid var(--line); min-height: 45vh; } #side { width: 110px; } }
 </style>
@@ -106,6 +110,11 @@
   <div id="dlgTitle" style="margin-bottom:6px;font-weight:600"></div>
   <textarea id="dlgText" spellcheck="false"></textarea>
   <div style="display:flex;gap:6px;justify-content:flex-end;margin-top:6px"><button value="cancel">Cancel</button><button value="save" id="dlgSave">Save</button></div>
+</form></dialog>
+<dialog id="ask"><form method="dialog">
+  <div id="askTitle" style="margin-bottom:8px;font-weight:600"></div>
+  <div id="askBody"></div>
+  <div style="display:flex;gap:6px;justify-content:flex-end;margin-top:10px"><button value="cancel">Cancel</button><button value="ok" id="askOk">OK</button></div>
 </form></dialog>
 <script src="src/util.js"></script>
 <script src="src/os.js"></script>

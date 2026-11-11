@@ -35,7 +35,14 @@
     print(`${sh.prompt()} ${line}`, 'cmd');
     const t = line.trim();
     if (t === 'clear') { out.textContent = ''; return; }
-    if (t === 'reset') { if (confirm('Erase all mock disks and the library?')) { localStorage.removeItem(KEY); k.listeners = []; boot(true); out.textContent = ''; welcome(); render(); } return; }
+    if (t === 'reset') {
+      askYes('Erase all mock disks and the library and start over?', 'Erase').then(yes => {
+        if (!yes) return print('reset cancelled', 'err');
+        try { localStorage.removeItem(KEY); } catch { /* blocked */ }
+        k.listeners = []; boot(true); out.textContent = ''; welcome(); render();
+      });
+      return;
+    }
     if (t) { const code = sh.exec(line); if (code) print(`[exit ${code}]`, 'err'); }
     save(); render();
   }
@@ -65,6 +72,7 @@
   }
   input.addEventListener('keydown', e => {
     if (e.key === 'Enter') {
+      e.preventDefault();
       const v = input.value; input.value = '';
       if (!v.trim() && sh.queue.length) { stepDemo(); return; }
       if (v.trim()) { hist.push(v); hi = hist.length; }
@@ -75,6 +83,34 @@
     else if (e.key === 'l' && e.ctrlKey) { e.preventDefault(); out.textContent = ''; }
   });
   $('term').addEventListener('click', () => { if (!window.getSelection().toString()) input.focus(); });
+
+  // ---------- in-page dialogs (the artifact viewer blocks prompt/confirm) ----------
+  // fields: [{id, label, value, type:'text'|'select'|'checkbox', options}] -> Promise<values|null>
+  function ask(title, fields = [], okLabel = 'OK') {
+    return new Promise(resolve => {
+      const dlg = $('ask'), body = $('askBody'); $('askTitle').textContent = title; $('askOk').textContent = okLabel; body.textContent = '';
+      const els = {};
+      for (const f of fields) {
+        const l = document.createElement('label'); let el;
+        if (f.type === 'select') { el = document.createElement('select'); for (const o of f.options) { const op = document.createElement('option'); op.value = o; op.textContent = o; el.appendChild(op); } el.value = f.value; }
+        else { el = document.createElement('input'); el.type = f.type === 'checkbox' ? 'checkbox' : 'text'; if (f.type === 'checkbox') el.checked = !!f.value; else el.value = f.value ?? ''; }
+        el.id = 'ask-' + f.id;
+        if (f.type === 'checkbox') { l.className = 'cb'; l.append(el, document.createTextNode(f.label)); } else l.append(document.createTextNode(f.label), el);
+        body.appendChild(l); els[f.id] = el;
+      }
+      dlg.returnValue = '';
+      dlg.onclose = () => {
+        if (dlg.returnValue !== 'ok') return resolve(null);
+        const v = {}; for (const f of fields) v[f.id] = f.type === 'checkbox' ? els[f.id].checked : els[f.id].value; resolve(v);
+      };
+      setTimeout(() => {
+        dlg.showModal();
+        const first = body.querySelector('input[type=text]'); if (first) { first.focus(); first.select(); }
+      }, 0);
+    });
+  }
+  const askText = async (title, value) => { const r = await ask(title, [{ id: 'v', label: '', value }]); return r ? r.v.trim() : null; };
+  const askYes = async (title, ok) => !!(await ask(title, [], ok || 'OK'));
 
   // ---------- finder ----------
   const finder = { cwd: Shell.HOME, sel: new Set(), clip: null };
@@ -94,10 +130,10 @@
   }
   const actions = {
     up: () => go(dirname(finder.cwd)),
-    mkdir: () => { const n = prompt('New folder name', 'untitled folder'); if (n) act(() => k.mkdir(join(finder.cwd, n))); },
-    newfile: () => { const n = prompt('New file name', 'untitled.txt'); if (n) act(() => { const p = join(finder.cwd, n); if (k.exists(p)) throw new Error('already exists'); k.writeFile(p, ''); }); },
+    mkdir: async () => { const n = await askText('New folder name', 'untitled folder'); if (n) act(() => k.mkdir(join(finder.cwd, n))); },
+    newfile: async () => { const n = await askText('New file name', 'untitled.txt'); if (n) act(() => { const p = join(finder.cwd, n); if (k.exists(p)) throw new Error('already exists'); k.writeFile(p, ''); }); },
     edit: () => { const [p] = selected(); if (p && k.stat(p).type === 'file') openFile(p); else fstat('select a file', true); },
-    rename: () => { const [p] = selected(); if (!p) return fstat('select an item', true); const n = prompt('Rename to', basename(p)); if (n && n !== basename(p)) act(() => { k.rename(p, join(finder.cwd, n), { noReplace: true }); finder.sel = new Set([n]); }); },
+    rename: async () => { const [p] = selected(); if (!p) return fstat('select an item', true); const n = await askText('Rename to', basename(p)); if (n && n !== basename(p)) act(() => { k.rename(p, join(finder.cwd, n), { noReplace: true }); finder.sel = new Set([n]); }); },
     cut: () => { finder.clip = { mode: 'cut', paths: selected() }; fstat(`${finder.clip.paths.length} item(s) cut — open a folder and Paste`); },
     copy: () => { finder.clip = { mode: 'copy', paths: selected() }; fstat(`${finder.clip.paths.length} item(s) copied`); },
     paste: () => {
@@ -105,11 +141,11 @@
       if (c.mode === 'cut') { moveInto(c.paths, finder.cwd); finder.clip = null; return; }
       act(() => { for (const p of c.paths) { let t = join(finder.cwd, basename(p)); for (let i = 2; k.exists(t); i++) t = join(finder.cwd, `${U.stem(basename(p))} ${i}${U.ext(basename(p)) ? '.' + U.ext(basename(p)) : ''}`); sh.copyTree(p, t, true); } });
     },
-    delete: () => { const ps = selected(); if (ps.length && confirm(`Delete ${ps.length} item(s)? (no trash in this mock OS)`)) act(() => { ps.forEach(p => k.rmTree(p)); finder.sel.clear(); }); },
-    date: () => {
+    delete: async () => { const ps = selected(); if (ps.length && await askYes(`Delete ${ps.length} item(s)? There is no trash in this mock OS.`, 'Delete')) act(() => { ps.forEach(p => k.rmTree(p)); finder.sel.clear(); }); },
+    date: async () => {
       const ps = selected(); if (!ps.length) return fstat('select items', true);
       const cur = U.fmtLocal(k.stat(ps[0]).mtime_ns, k.tzMin);
-      const v = prompt('Modification time (local, YYYY-MM-DD HH:MM[:SS])', cur); if (!v) return;
+      const v = await askText('Modification time (local, YYYY-MM-DD HH:MM[:SS])', cur); if (!v) return;
       act(() => { const t = U.parseLocal(v, k.tzMin); if (t == null) throw new Error('bad date'); ps.forEach(p => k.utimes(p, t)); });
     },
     term: () => { sh.cwd = finder.cwd; render(); input.focus(); },
@@ -148,10 +184,13 @@
     const ejected = k.disks().filter(d => !d.mountedAt);
     if (ejected.length) { h('Unplugged'); for (const d of ejected) { const x = document.createElement('div'); x.className = 'it'; x.textContent = `⏏ ${d.name}`; x.title = 'Plug back in'; x.onclick = () => act(() => k.mountDisk(d.name)); side.appendChild(x); } }
     const add = document.createElement('button'); add.textContent = '+ Plug in disk'; add.style.marginTop = '10px';
-    add.onclick = () => {
-      const name = prompt('Disk name', 'CARD'); if (!name) return;
-      const fs = prompt('Filesystem: exfat, msdos, apfs, apfs-cs, hfs, smbfs', 'exfat'); if (!fs) return;
-      const card = confirm('Fill it with camera files (DCIM)?');
+    add.onclick = async () => {
+      const r = await ask('Plug in a disk', [
+        { id: 'name', label: 'Name', value: 'CARD' },
+        { id: 'fs', label: 'Filesystem', type: 'select', value: 'exfat', options: Object.keys(OS.FS_PROFILES) },
+        { id: 'card', label: 'Fill it with camera files (DCIM)', type: 'checkbox', value: true }], 'Plug in');
+      if (!r || !r.name.trim()) return;
+      const name = r.name.trim(), fs = r.fs, card = r.card;
       act(() => { const v = k.createDisk({ name, fs }); if (card) window.Gen.card(k, v.mountedAt); finder.cwd = v.mountedAt; });
     };
     side.appendChild(add);
