@@ -45,6 +45,7 @@
   #builder input[type=text], #builder select { font: 12px ui-monospace, Menlo, monospace; background: #22252c; color: var(--term-text); border: 1px solid #3a3e48; border-radius: 4px; padding: 3px 5px; max-width: 100%; }
   #builder #bCmd { font-weight: 600; color: var(--term-accent); }
   #builder .bflag { color: var(--term-text); }
+  #bDesc { flex: 1 1 220px; min-width: 0; color: var(--term-muted); font-style: italic; }
   #builder .bdesc { color: var(--term-muted); font-style: italic; }
   #builder button { background: #22252c; color: var(--term-text); border-color: #3a3e48; }
   #builder button:disabled { opacity: .45; cursor: default; }
@@ -2603,74 +2604,74 @@ ui        clear   reset   (state is saved in this browser's localStorage)`;
   const yes = (l = 'apply (--yes)') => ({ n: 'yes', l, t: 'flag', f: '--yes' });
   const C = [
     ['asscat: library', [
-      { c: 'asscat library', d: 'show the configured library' },
-      { c: 'asscat library open', d: 'choose and open a library folder', a: [{ n: 'dir', l: 'folder', t: 'path', req: true, def: '.' }, { n: 'so', l: '--start-over', t: 'flag', f: '--start-over' }] },
-      { c: 'asscat library forget', a: [{ n: 'dir', l: 'folder', t: 'path', req: true }] },
-      { c: 'asscat sync', d: 'scan the library', a: [{ n: 'm', l: 'mode', t: 'select', opts: ['fast', 'full'] }] },
-      { c: 'asscat files', d: 'what the library knows about files', a: [sel] },
-      { c: 'asscat search', a: [{ n: 'q', l: 'words', t: 'text', req: true, ph: 'makarska plaz' }] },
-      { c: 'asscat db', d: 'dump a table', a: [{ n: 't', l: 'table', t: 'select', opts: ['', 'library', 'files', 'paths', 'path_history', 'tags', 'edges', 'keywords', 'settings', 'views', 'ops', 'op_steps'] }] },
+      { c: 'asscat library', d: 'ukáže knihovnu z configu, počty souborů, tagů a pohledů' },
+      { c: 'asscat library open', d: 'zvolí složku jako knihovnu a otevře ji; nová složka = nová databáze, --start-over = nová prázdná místo chybějící/poškozené', a: [{ n: 'dir', l: 'folder', t: 'path', req: true, def: '.' }, { n: 'so', l: '--start-over', t: 'flag', f: '--start-over' }] },
+      { c: 'asscat library forget', d: 'odebere knihovnu z configu (soubory ani databázi nemaže)', a: [{ n: 'dir', l: 'folder', t: 'path', req: true }] },
+      { c: 'asscat sync', d: 'projde knihovnu na disku: nové, změněné, přesunuté a zmizelé soubory; fast hashuje jen nové, full všechno znovu', a: [{ n: 'm', l: 'mode', t: 'select', opts: ['fast', 'full'] }] },
+      { c: 'asscat files', d: 'co knihovna ví o souborech: file_id, všechny cesty, historie cest, tagy (i zděděné), hrany', a: [sel] },
+      { c: 'asscat search', d: 'hledá podle slov z cest (i starých) a tagů; bez diakritiky, stačí začátek slova', a: [{ n: 'q', l: 'words', t: 'text', req: true, ph: 'makarska plaz' }] },
+      { c: 'asscat db', d: 'vypíše tabulku databáze (jen pro demo); bez tabulky ukáže počty řádků', a: [{ n: 't', l: 'table', t: 'select', opts: ['', 'library', 'files', 'paths', 'path_history', 'tags', 'edges', 'keywords', 'settings', 'views', 'ops', 'op_steps'] }] },
     ]],
     ['asscat: card', [
-      { c: 'asscat volumes' },
-      { c: 'asscat check', a: [{ n: 'v', l: 'volume', t: 'text', req: true, src: S.mounted }] },
-      { c: 'asscat import', a: [{ n: 'v', l: 'volume', t: 'text', req: true, src: S.mounted }] },
-      { c: 'asscat filter' },
-      { c: 'asscat filter set', a: [{ n: 'j', l: 'json', t: 'text', req: true, def: '{"include_ext":["jpg","jpeg","cr3","arw","mp4","mov"]}' }] },
-      { c: 'asscat shoots', d: 'propose shoots for _inbox', a: [{ n: 'r', l: 'gap', t: 'text', def: '2h', src: S.durations }, { n: 'm', l: 'min files', t: 'num', def: '3' }, { n: 'o', l: 'save to', t: 'redirect', def: '/tmp/proposal.json' }] },
-      { c: 'asscat shoots apply', a: [{ n: 'f', l: 'proposal', t: 'path', req: true, def: '/tmp/proposal.json' }, yes()] },
-      { c: 'jsonset', d: 'fill a value in the proposal', a: [{ n: 'f', l: 'file', t: 'path', req: true, def: '/tmp/proposal.json' }, { n: 'p', l: 'field', t: 'text', req: true, def: 'shoots.0.name', src: () => ['shoots.0.name', 'shoots.0.klient', 'shoots.1.name', 'shoots.1.klient'] }, { n: 'v', l: 'value', t: 'text', req: true }] },
+      { c: 'asscat volumes', d: 'seznam připojených vyměnitelných disků (karty, USB)' },
+      { c: 'asscat check', d: 'porovná kartu s knihovnou: co je nové a co už v knihovně je (nic nekopíruje)', a: [{ n: 'v', l: 'volume', t: 'text', req: true, src: S.mounted }] },
+      { c: 'asscat import', d: 'zkopíruje nové soubory z karty do _inbox s ověřením a zaindexuje je', a: [{ n: 'v', l: 'volume', t: 'text', req: true, src: S.mounted }] },
+      { c: 'asscat filter', d: 'ukáže filtr přípon pro import' },
+      { c: 'asscat filter set', d: 'nastaví filtr přípon pro import (JSON)', a: [{ n: 'j', l: 'json', t: 'text', req: true, def: '{"include_ext":["jpg","jpeg","cr3","arw","mp4","mov"]}' }] },
+      { c: 'asscat shoots', d: 'navrhne shooty v _inbox podle mezer v čase; výsledek ulož do souboru a doplň jména', a: [{ n: 'r', l: 'gap', t: 'text', def: '2h', src: S.durations }, { n: 'm', l: 'min files', t: 'num', def: '3' }, { n: 'o', l: 'save to', t: 'redirect', def: '/tmp/proposal.json' }] },
+      { c: 'asscat shoots apply', d: 'z vyplněného návrhu přidá tagy shoot a klient; bez --yes jen náhled', a: [{ n: 'f', l: 'proposal', t: 'path', req: true, def: '/tmp/proposal.json' }, yes()] },
+      { c: 'jsonset', d: 'vyplní jednu hodnotu v JSON souboru (např. jméno shootu v návrhu)', a: [{ n: 'f', l: 'file', t: 'path', req: true, def: '/tmp/proposal.json' }, { n: 'p', l: 'field', t: 'text', req: true, def: 'shoots.0.name', src: () => ['shoots.0.name', 'shoots.0.klient', 'shoots.1.name', 'shoots.1.klient'] }, { n: 'v', l: 'value', t: 'text', req: true }] },
     ]],
     ['asscat: tags & edges', [
-      { c: 'asscat tag add', a: [{ n: 'key', l: 'key', t: 'text', req: true, src: S.tagKeys, ph: 'klient' }, { n: 'val', l: 'value', t: 'text', req: true, src: S.tagValues('key') }, sel, yes()] },
-      { c: 'asscat tag remove', a: [{ n: 'key', l: 'key', t: 'text', req: true, src: S.tagKeys }, { n: 'val', l: 'value', t: 'text', req: true, src: S.tagValues('key') }, sel, yes()] },
-      { c: 'asscat tag rename-value', a: [{ n: 'key', l: 'key', t: 'text', req: true, src: S.tagKeys }, { n: 'old', l: 'old', t: 'text', req: true, src: S.tagValues('key') }, { n: 'new', l: 'new', t: 'text', req: true }, yes()] },
-      { c: 'asscat tag rename-key', a: [{ n: 'old', l: 'old key', t: 'text', req: true, src: S.tagKeys }, { n: 'new', l: 'new key', t: 'text', req: true }, yes()] },
-      { c: 'asscat tag values', a: [{ n: 'key', l: 'key', t: 'text', req: true, src: S.tagKeys }] },
-      { c: 'asscat edge', d: 'manual edge original -> edit', a: [{ n: 'op', l: '', t: 'select', opts: ['add', 'confirm', 'reject'] }, { n: 'o', l: 'original', t: 'path', req: true }, { n: 'e', l: 'edit', t: 'path', req: true }] },
-      { c: 'asscat edge list', a: [{ n: 'p', l: 'file', t: 'path', req: true }] },
-      { c: 'asscat setting get', a: [{ n: 'key', l: 'key', t: 'select', opts: S.settings }] },
-      { c: 'asscat setting set', a: [{ n: 'key', l: 'key', t: 'select', opts: S.settings }, { n: 'v', l: 'value (JSON)', t: 'text', req: true, src: S.settingValues }] },
+      { c: 'asscat tag add', d: 'přidá tag vybraným souborům; existující zápis hodnoty vyhrává; bez --yes jen náhled', a: [{ n: 'key', l: 'key', t: 'text', req: true, src: S.tagKeys, ph: 'klient' }, { n: 'val', l: 'value', t: 'text', req: true, src: S.tagValues('key') }, sel, yes()] },
+      { c: 'asscat tag remove', d: 'odebere vlastní tag; zděděný jde odebrat jen u originálu; bez --yes jen náhled', a: [{ n: 'key', l: 'key', t: 'text', req: true, src: S.tagKeys }, { n: 'val', l: 'value', t: 'text', req: true, src: S.tagValues('key') }, sel, yes()] },
+      { c: 'asscat tag rename-value', d: 'přejmenuje hodnotu tagu ve všech souborech, se stávající se sloučí', a: [{ n: 'key', l: 'key', t: 'text', req: true, src: S.tagKeys }, { n: 'old', l: 'old', t: 'text', req: true, src: S.tagValues('key') }, { n: 'new', l: 'new', t: 'text', req: true }, yes()] },
+      { c: 'asscat tag rename-key', d: 'přejmenuje klíč tagu ve všech souborech, se stávajícím se sloučí', a: [{ n: 'old', l: 'old key', t: 'text', req: true, src: S.tagKeys }, { n: 'new', l: 'new key', t: 'text', req: true }, yes()] },
+      { c: 'asscat tag values', d: 'existující hodnoty klíče a počet souborů u každé', a: [{ n: 'key', l: 'key', t: 'text', req: true, src: S.tagKeys }] },
+      { c: 'asscat edge', d: 'ruční hrana originál → úprava (úprava dědí tagy originálu); confirm/reject mění stav existující hrany', a: [{ n: 'op', l: '', t: 'select', opts: ['add', 'confirm', 'reject'] }, { n: 'o', l: 'original', t: 'path', req: true }, { n: 'e', l: 'edit', t: 'path', req: true }] },
+      { c: 'asscat edge list', d: 'předci a potomci souboru přes hrany', a: [{ n: 'p', l: 'file', t: 'path', req: true }] },
+      { c: 'asscat setting get', d: 'ukáže hodnotu nastavení knihovny', a: [{ n: 'key', l: 'key', t: 'select', opts: S.settings }] },
+      { c: 'asscat setting set', d: 'změní nastavení: chování hran, import, ignorované soubory, zamčené složky', a: [{ n: 'key', l: 'key', t: 'select', opts: S.settings }, { n: 'v', l: 'value (JSON)', t: 'text', req: true, src: S.settingValues }] },
     ]],
     ['asscat: views', [
-      { c: 'asscat view set', a: [{ n: 'name', l: 'name', t: 'text', req: true, src: S.views }, { n: 'tpl', l: 'template', t: 'text', req: true, src: S.templates }, { n: 'f', l: 'filter k=v, …', t: 'multi', f: '--filter', ph: 'druh=foto' }, { n: 'none', l: 'none names k=name, …', t: 'multi', f: '--none', ph: 'klient=bez klienta' }] },
-      { c: 'asscat view list' },
-      { c: 'asscat view show', a: [{ n: 'name', l: 'view', t: 'text', req: true, src: S.views }, { n: 'f', l: 'virtual folder', t: 'text', ph: 'Qila/2026' }] },
-      { c: 'asscat view activate', a: [{ n: 'name', l: 'view', t: 'text', req: true, src: S.views }] },
-      { c: 'asscat view delete', a: [{ n: 'name', l: 'view', t: 'text', req: true, src: S.views }] },
-      { c: 'asscat materialize', d: 'without apply = preview only', a: [{ n: 'name', l: 'view', t: 'text', req: true, src: S.views }, { n: 'rc', l: '--rename-conflicts', t: 'flag', f: '--rename-conflicts' }, { n: 'ap', l: '--apply', t: 'flag', f: '--apply' }, { n: 'cr', l: 'crash after N renames', t: 'opt', f: '--crash-after', pre: true, ph: '' }] },
-      { c: 'asscat materialize undo', a: [{ n: 'ap', l: '--apply', t: 'flag', f: '--apply' }] },
+      { c: 'asscat view set', d: 'uloží pohled: šablona složek z tagů a počítaných údajů, filtr a názvy pro chybějící hodnotu', a: [{ n: 'name', l: 'name', t: 'text', req: true, src: S.views }, { n: 'tpl', l: 'template', t: 'text', req: true, src: S.templates }, { n: 'f', l: 'filter k=v, …', t: 'multi', f: '--filter', ph: 'druh=foto' }, { n: 'none', l: 'none names k=name, …', t: 'multi', f: '--none', ph: 'klient=bez klienta' }] },
+      { c: 'asscat view list', d: 'seznam uložených pohledů' },
+      { c: 'asscat view show', d: 'strom virtuálních složek pohledu, nebo obsah jedné složky (nic se nepřesouvá)', a: [{ n: 'name', l: 'view', t: 'text', req: true, src: S.views }, { n: 'f', l: 'virtual folder', t: 'text', ph: 'Qila/2026' }] },
+      { c: 'asscat view activate', d: 'nastaví aktivní pohled (ten se použije po importu při import.after = auto)', a: [{ n: 'name', l: 'view', t: 'text', req: true, src: S.views }] },
+      { c: 'asscat view delete', d: 'smaže pohled (soubory zůstanou, kde jsou)', a: [{ n: 'name', l: 'view', t: 'text', req: true, src: S.views }] },
+      { c: 'asscat materialize', d: 'přesune soubory na disku podle pohledu; bez --apply jen náhled; crash after = simulace pádu', a: [{ n: 'name', l: 'view', t: 'text', req: true, src: S.views }, { n: 'rc', l: '--rename-conflicts', t: 'flag', f: '--rename-conflicts' }, { n: 'ap', l: '--apply', t: 'flag', f: '--apply' }, { n: 'cr', l: 'crash after N renames', t: 'opt', f: '--crash-after', pre: true, ph: '' }] },
+      { c: 'asscat materialize undo', d: 'vrátí poslední zhmotnění; soubory mezitím přesunuté zůstanou; bez --apply jen náhled', a: [{ n: 'ap', l: '--apply', t: 'flag', f: '--apply' }] },
     ]],
     ['files', [
-      { c: 'ls', a: [{ n: 'l', l: '-l', t: 'flag', f: '-l', def: true }, { n: 'a', l: '-a', t: 'flag', f: '-a' }, { n: 'p', l: 'path', t: 'path' }] },
-      { c: 'cd', a: [{ n: 'p', l: 'folder', t: 'path', def: '~/Pictures/Knihovna' }] },
-      { c: 'tree', a: [{ n: 'p', l: 'path', t: 'path' }] },
-      { c: 'cat', a: [{ n: 'p', l: 'file', t: 'path', req: true }] },
-      { c: 'mkdir -p', a: [{ n: 'p', l: 'folder', t: 'path', req: true }] },
-      { c: 'mv', d: 'move / rename (across disks = copy + delete)', a: [{ n: 's', l: 'from', t: 'path', req: true }, { n: 'd', l: 'to', t: 'path', req: true }] },
-      { c: 'cp -rp', a: [{ n: 's', l: 'from', t: 'path', req: true }, { n: 'd', l: 'to', t: 'path', req: true }] },
-      { c: 'rm -r', a: [{ n: 'p', l: 'path', t: 'path', req: true }] },
-      { c: 'write', d: 'overwrite a file with text (like saving in an editor)', a: [{ n: 'p', l: 'file', t: 'path', req: true }, { n: 't', l: 'text', t: 'text', req: true, def: 'edited content' }] },
-      { c: 'touch -d', d: 'set modification time', a: [{ n: 'd', l: 'date', t: 'text', req: true, def: '2026-08-07 10:00' }, { n: 'p', l: 'file', t: 'path', req: true }] },
-      { c: 'chmod', a: [{ n: 'm', l: 'mode', t: 'select', opts: ['000', '644'] }, { n: 'p', l: 'file', t: 'path', req: true }] },
-      { c: 'genphotos', d: 'create mock photos', a: [{ n: 'd', l: 'folder', t: 'path', req: true }, { n: 'n', l: 'count', t: 'num', req: true, def: '5' }, { n: 's', l: 'start', t: 'opt', f: '--start', def: '2026-08-07 10:00' }, { n: 'e', l: 'every', t: 'opt', f: '--every', def: '2m' }, { n: 'x', l: 'prefix', t: 'opt', f: '--prefix', ph: 'IMG_' }, { n: 'ext', l: 'ext', t: 'opt', f: '--ext', ph: 'JPG' }] },
-      { c: 'mkfile', a: [{ n: 'p', l: 'file', t: 'path', req: true }, { n: 'kb', l: 'KB', t: 'opt', f: '--kb', ph: '1' }] },
+      { c: 'ls', d: 'vypíše obsah složky', a: [{ n: 'l', l: '-l', t: 'flag', f: '-l', def: true }, { n: 'a', l: '-a', t: 'flag', f: '-a' }, { n: 'p', l: 'path', t: 'path' }] },
+      { c: 'cd', d: 'přejde do složky', a: [{ n: 'p', l: 'folder', t: 'path', def: '~/Pictures/Knihovna' }] },
+      { c: 'tree', d: 'strom složek a souborů', a: [{ n: 'p', l: 'path', t: 'path' }] },
+      { c: 'cat', d: 'vypíše obsah souboru', a: [{ n: 'p', l: 'file', t: 'path', req: true }] },
+      { c: 'mkdir -p', d: 'vytvoří složku (i s nadřazenými)', a: [{ n: 'p', l: 'folder', t: 'path', req: true }] },
+      { c: 'mv', d: 'přesune nebo přejmenuje; mezi disky = kopie + smazání, data změny zůstanou', a: [{ n: 's', l: 'from', t: 'path', req: true }, { n: 'd', l: 'to', t: 'path', req: true }] },
+      { c: 'cp -rp', d: 'zkopíruje soubor nebo složku, zachová data změny', a: [{ n: 's', l: 'from', t: 'path', req: true }, { n: 'd', l: 'to', t: 'path', req: true }] },
+      { c: 'rm -r', d: 'smaže soubor nebo složku (koš tu není)', a: [{ n: 'p', l: 'path', t: 'path', req: true }] },
+      { c: 'write', d: 'přepíše soubor textem, jako uložení v editoru (nový obsah, nový čas)', a: [{ n: 'p', l: 'file', t: 'path', req: true }, { n: 't', l: 'text', t: 'text', req: true, def: 'edited content' }] },
+      { c: 'touch -d', d: 'nastaví souboru čas změny (vytvoří ho, když neexistuje)', a: [{ n: 'd', l: 'date', t: 'text', req: true, def: '2026-08-07 10:00' }, { n: 'p', l: 'file', t: 'path', req: true }] },
+      { c: 'chmod', d: '000 = soubor nejde číst (ukázka chyby čtení), 644 = zase jde', a: [{ n: 'm', l: 'mode', t: 'select', opts: ['000', '644'] }, { n: 'p', l: 'file', t: 'path', req: true }] },
+      { c: 'genphotos', d: 'vytvoří falešné fotky IMG_0001.JPG… s časy od start po krocích every', a: [{ n: 'd', l: 'folder', t: 'path', req: true }, { n: 'n', l: 'count', t: 'num', req: true, def: '5' }, { n: 's', l: 'start', t: 'opt', f: '--start', def: '2026-08-07 10:00' }, { n: 'e', l: 'every', t: 'opt', f: '--every', def: '2m' }, { n: 'x', l: 'prefix', t: 'opt', f: '--prefix', ph: 'IMG_' }, { n: 'ext', l: 'ext', t: 'opt', f: '--ext', ph: 'JPG' }] },
+      { c: 'mkfile', d: 'vytvoří jeden falešný soubor s náhodným obsahem', a: [{ n: 'p', l: 'file', t: 'path', req: true }, { n: 'kb', l: 'KB', t: 'opt', f: '--kb', ph: '1' }] },
     ]],
     ['disks & system', [
-      { c: 'disk', d: 'list disks' },
-      { c: 'disk create', d: 'plug in a new disk', a: [{ n: 'n', l: 'name', t: 'text', req: true, def: 'CARD' }, { n: 'fs', l: 'fs', t: 'opt', f: '--fs', sel: ['exfat', 'msdos', 'apfs', 'apfs-cs', 'hfs', 'smbfs'], def: 'exfat' }, { n: 'card', l: 'camera files', t: 'flag', f: '--card', def: true }] },
-      { c: 'disk eject', a: [{ n: 'n', l: 'disk', t: 'text', req: true, src: S.mounted }] },
-      { c: 'disk mount', a: [{ n: 'n', l: 'disk', t: 'text', req: true, src: S.unmounted }] },
-      { c: 'clock', d: 'move the clock', a: [{ n: 'd', l: 'by', t: 'text', req: true, def: '+1d', src: S.durations }] },
-      { c: 'tz', d: 'timezone, minutes east of UTC', a: [{ n: 'm', l: 'minutes', t: 'select', opts: ['60', '120', '0', '-300'] }] },
-      { c: 'io', a: [{ n: 'r', l: 'reset', t: 'select', opts: ['', 'reset'] }] },
-      { c: 'ps' },
-      { c: 'kill', a: [{ n: 'p', l: 'pid', t: 'text', req: true, src: S.procs }] },
-      { c: 'holdlock', d: 'another process keeps the library locked', a: [{ n: 'p', l: 'library', t: 'path', req: true, def: '.' }, { n: 'h', l: 'host', t: 'opt', f: '--host', def: 'MacBook-Studio' }] },
-      { c: 'demo', a: [{ n: 'n', l: 'demo', t: 'select', opts: S.demos }] },
-      { c: 'selftest' },
-      { c: 'help' },
-      { c: 'asscat help' },
+      { c: 'disk', d: 'seznam disků (i vysunutých) a jejich souborových systémů' },
+      { c: 'disk create', d: 'připojí nový disk; s camera files rovnou jako kartu z foťáku (DCIM)', a: [{ n: 'n', l: 'name', t: 'text', req: true, def: 'CARD' }, { n: 'fs', l: 'fs', t: 'opt', f: '--fs', sel: ['exfat', 'msdos', 'apfs', 'apfs-cs', 'hfs', 'smbfs'], def: 'exfat' }, { n: 'card', l: 'camera files', t: 'flag', f: '--card', def: true }] },
+      { c: 'disk eject', d: 'vysune disk (nejde, když ho drží zámek knihovny)', a: [{ n: 'n', l: 'disk', t: 'text', req: true, src: S.mounted }] },
+      { c: 'disk mount', d: 'znovu připojí vysunutý disk', a: [{ n: 'n', l: 'disk', t: 'text', req: true, src: S.unmounted }] },
+      { c: 'clock', d: 'posune hodiny systému (např. kvůli denním zálohám nebo hledání podle atime)', a: [{ n: 'd', l: 'by', t: 'text', req: true, def: '+1d', src: S.durations }] },
+      { c: 'tz', d: 'časové pásmo v minutách od UTC; na FAT/exFAT se tím posunou časy souborů', a: [{ n: 'm', l: 'minutes', t: 'select', opts: ['60', '120', '0', '-300'] }] },
+      { c: 'io', d: 'počítadlo čtení souborů (ukáže, že přesun složky nic nečte); reset ho vynuluje', a: [{ n: 'r', l: 'reset', t: 'select', opts: ['', 'reset'] }] },
+      { c: 'ps', d: 'běžící procesy (např. ten, co drží zámek)' },
+      { c: 'kill', d: 'ukončí proces; %lock ukončí všechny, co drží zámek knihovny', a: [{ n: 'p', l: 'pid', t: 'text', req: true, src: S.procs }] },
+      { c: 'holdlock', d: 'spustí jiný proces, který drží knihovnu zamčenou (ukázka chyby zámku)', a: [{ n: 'p', l: 'library', t: 'path', req: true, def: '.' }, { n: 'h', l: 'host', t: 'opt', f: '--host', def: 'MacBook-Studio' }] },
+      { c: 'demo', d: 'spustí průvodce; pak Enter na prázdném řádku = další krok', a: [{ n: 'n', l: 'demo', t: 'select', opts: S.demos }] },
+      { c: 'selftest', d: 'spustí 22 přijímacích testů ze specifikace' },
+      { c: 'help', d: 'nápověda k shellu' },
+      { c: 'asscat help', d: 'nápověda k asscat-cli' },
     ]],
   ];
   const ALL = C.flatMap(([g, list]) => list.map(x => ({ ...x, group: g, a: x.a || [] })));
@@ -2716,14 +2717,15 @@ ui        clear   reset   (state is saved in this browser's localStorage)`;
     const pick = el('select', { id: 'bCmd', title: 'command' });
     for (const [g, cmds] of C) {
       const og = el('optgroup', { label: g });
-      for (const c of cmds) og.append(el('option', { value: ALL.findIndex(x => x.c === c.c && x.group === g), textContent: c.c.replace(/^asscat /, '') }));
+      for (const c of cmds) og.append(el('option', { value: ALL.findIndex(x => x.c === c.c && x.group === g), textContent: c.c.replace(/^asscat /, ''), title: c.d || '' }));
       pick.append(og);
     }
     const fields = el('div', { id: 'bFields' });
     const preview = el('code', { id: 'bPreview' });
     const run = el('button', { id: 'bRun', textContent: 'Run', title: 'run this command (same as typing it)' });
     const edit = el('button', { id: 'bEdit', textContent: '↓ to prompt', title: 'copy into the text prompt to change it by hand' });
-    root.append(el('div', { className: 'brow' }, pick, fields), el('div', { className: 'brow' }, preview, run, edit));
+    const desc = el('div', { id: 'bDesc' });
+    root.append(el('div', { className: 'brow' }, pick, desc), el('div', { className: 'brow' }, fields), el('div', { className: 'brow' }, preview, run, edit));
     let cur = ALL[0], inputs = {}, dlSeq = 0;
 
     const values = () => {
@@ -2754,7 +2756,7 @@ ui        clear   reset   (state is saved in this browser's localStorage)`;
 
     function render() {
       fields.replaceChildren(); inputs = {};
-      if (cur.d) fields.append(el('span', { className: 'bdesc', textContent: cur.d }));
+      desc.textContent = cur.d || '';
       for (const f of cur.a) {
         let inp;
         if (f.t === 'flag') { inp = el('input', { type: 'checkbox', checked: !!f.def }); fields.append(el('label', { className: 'bflag' }, inp, f.l)); }
