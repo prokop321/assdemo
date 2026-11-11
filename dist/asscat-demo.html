@@ -1,0 +1,2761 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Asscat Demo OS</title>
+<style>
+  :root {
+    --bg: #f6f6f4; --panel: #ffffff; --line: #d9d9d4; --text: #1d1d1b; --muted: #6b6b66;
+    --accent: #2457c5; --sel: #dbe6ff; --err: #b3261e; --term-bg: #16181d; --term-text: #e4e6eb; --term-muted: #8a909c; --term-accent: #7fb0ff;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #121316; --panel: #1b1d22; --line: #30333a; --text: #e6e7ea; --muted: #9a9ea8;
+      --accent: #7fb0ff; --sel: #26365a; --err: #ff8a80; --term-bg: #0d0e11; --term-text: #e4e6eb; --term-muted: #8a909c; --term-accent: #7fb0ff;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #121316; --panel: #1b1d22; --line: #30333a; --text: #e6e7ea; --muted: #9a9ea8;
+    --accent: #7fb0ff; --sel: #26365a; --err: #ff8a80; --term-bg: #0d0e11; --term-text: #e4e6eb; --term-muted: #8a909c; --term-accent: #7fb0ff;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; }
+  body { background: var(--bg); color: var(--text); font: 13px/1.4 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; display: flex; flex-direction: column; }
+  header { display: flex; gap: 12px; align-items: center; padding: 6px 12px; border-bottom: 1px solid var(--line); flex-wrap: wrap; }
+  header b { font-size: 14px; }
+  header .sp { flex: 1; }
+  header .clock { color: var(--muted); font-variant-numeric: tabular-nums; }
+  button { font: inherit; color: var(--text); background: var(--panel); border: 1px solid var(--line); border-radius: 5px; padding: 2px 8px; cursor: pointer; }
+  button:hover { border-color: var(--accent); }
+  main { flex: 1; display: flex; min-height: 0; }
+  #term { flex: 1.2; min-width: 0; background: var(--term-bg); color: var(--term-text); display: flex; flex-direction: column; font: 12.5px/1.45 ui-monospace, SFMono-Regular, Menlo, monospace; }
+  #out { flex: 1; overflow: auto; padding: 10px 12px; white-space: pre-wrap; word-break: break-word; }
+  #out .cmd { color: var(--term-accent); }
+  #out .err { color: var(--term-muted); }
+  #out .note { color: #e5c07b; }
+  #inrow { display: flex; gap: 6px; padding: 6px 12px 8px; border-top: 1px solid #2a2d35; align-items: center; }
+  #prompt { color: var(--term-accent); white-space: nowrap; }
+  #in { flex: 1; background: transparent; color: inherit; border: 0; outline: 0; font: inherit; min-width: 0; }
+  #next { color: #e5c07b; padding: 0 12px 6px; display: none; white-space: pre-wrap; }
+  #finder { flex: 1; min-width: 0; display: flex; border-left: 1px solid var(--line); background: var(--panel); }
+  #side { width: 150px; border-right: 1px solid var(--line); padding: 8px; overflow: auto; flex-shrink: 0; }
+  #side h4 { margin: 8px 0 4px; font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; }
+  #side .it { padding: 2px 6px; border-radius: 4px; cursor: pointer; display: flex; justify-content: space-between; gap: 4px; }
+  #side .it:hover, #side .it.drop { background: var(--sel); }
+  #side .ej { color: var(--muted); }
+  #fmain { flex: 1; display: flex; flex-direction: column; min-width: 0; }
+  #ftool { display: flex; flex-wrap: wrap; gap: 4px; padding: 6px; border-bottom: 1px solid var(--line); align-items: center; }
+  #fpath { flex: 1 1 100%; font: 12px ui-monospace, Menlo, monospace; padding: 3px 6px; border: 1px solid var(--line); border-radius: 4px; background: var(--bg); color: var(--text); }
+  #flist { flex: 1; overflow: auto; }
+  table { width: 100%; border-collapse: collapse; }
+  th { text-align: left; font-weight: 500; color: var(--muted); font-size: 11px; padding: 4px 8px; border-bottom: 1px solid var(--line); position: sticky; top: 0; background: var(--panel); }
+  td { padding: 3px 8px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 260px; }
+  tr.row { cursor: default; user-select: none; }
+  tr.row:hover td { background: color-mix(in srgb, var(--sel) 50%, transparent); }
+  tr.row.sel td { background: var(--sel); }
+  tr.row.drop td { outline: 2px solid var(--accent); outline-offset: -2px; }
+  td.num { text-align: right; font-variant-numeric: tabular-nums; color: var(--muted); }
+  td.dim { color: var(--muted); font-variant-numeric: tabular-nums; }
+  #fstat { padding: 4px 8px; border-top: 1px solid var(--line); color: var(--muted); min-height: 24px; }
+  #fstat.bad { color: var(--err); }
+  dialog { border: 1px solid var(--line); border-radius: 8px; background: var(--panel); color: var(--text); width: min(640px, 92vw); }
+  dialog textarea { width: 100%; height: 50vh; font: 12px ui-monospace, Menlo, monospace; background: var(--bg); color: var(--text); border: 1px solid var(--line); }
+  @media (max-width: 760px) { main { flex-direction: column; } #finder { border-left: 0; border-top: 1px solid var(--line); min-height: 45vh; } #side { width: 110px; } }
+</style>
+</head>
+<body>
+<header>
+  <b>Asscat demo · mock OS</b>
+  <span class="clock" id="clock"></span>
+  <span class="sp"></span>
+  <button id="bDemo" title="Start the first walkthrough">▶ demo tour</button>
+  <button id="bTest" title="Run the 22 acceptance scenarios from the spec">selftest</button>
+  <button id="bReset" title="Erase all mock disks and start over">reset</button>
+</header>
+<main>
+  <section id="term">
+    <div id="out"></div>
+    <div id="next"></div>
+    <div id="inrow"><span id="prompt"></span><input id="in" autocomplete="off" spellcheck="false" autofocus></div>
+  </section>
+  <section id="finder">
+    <nav id="side"></nav>
+    <div id="fmain">
+      <div id="ftool">
+        <button data-a="up" title="Enclosing folder">↑</button>
+        <button data-a="mkdir">New folder</button>
+        <button data-a="newfile">New file</button>
+        <button data-a="edit" title="Open the file in a text editor; saving overwrites it (new mtime)">Edit</button>
+        <button data-a="rename">Rename</button>
+        <button data-a="cut">Cut</button>
+        <button data-a="copy">Copy</button>
+        <button data-a="paste">Paste</button>
+        <button data-a="delete">Delete</button>
+        <button data-a="date" title="Set modification time">Set date</button>
+        <button data-a="term" title="cd the terminal here">⌨ here</button>
+        <label><input type="checkbox" id="hidden"> hidden</label>
+        <input id="fpath" spellcheck="false">
+      </div>
+      <div id="flist"></div>
+      <div id="fstat"></div>
+    </div>
+  </section>
+</main>
+<dialog id="dlg"><form method="dialog">
+  <div id="dlgTitle" style="margin-bottom:6px;font-weight:600"></div>
+  <textarea id="dlgText" spellcheck="false"></textarea>
+  <div style="display:flex;gap:6px;justify-content:flex-end;margin-top:6px"><button value="cancel">Cancel</button><button value="save" id="dlgSave">Save</button></div>
+</form></dialog>
+<script>
+// Shared helpers: hashing, unicode, time formatting. Classic script, attaches to globalThis.U.
+(function (G) {
+  'use strict';
+  const enc = new TextEncoder();
+
+  // --- SHA-256 (synchronous). Stand-in for BLAKE3 in this demo. ---
+  const K = new Uint32Array([
+    0x428a2f98, 0x71374491, 0xb5c0fbcf, 0xe9b5dba5, 0x3956c25b, 0x59f111f1, 0x923f82a4, 0xab1c5ed5,
+    0xd807aa98, 0x12835b01, 0x243185be, 0x550c7dc3, 0x72be5d74, 0x80deb1fe, 0x9bdc06a7, 0xc19bf174,
+    0xe49b69c1, 0xefbe4786, 0x0fc19dc6, 0x240ca1cc, 0x2de92c6f, 0x4a7484aa, 0x5cb0a9dc, 0x76f988da,
+    0x983e5152, 0xa831c66d, 0xb00327c8, 0xbf597fc7, 0xc6e00bf3, 0xd5a79147, 0x06ca6351, 0x14292967,
+    0x27b70a85, 0x2e1b2138, 0x4d2c6dfc, 0x53380d13, 0x650a7354, 0x766a0abb, 0x81c2c92e, 0x92722c85,
+    0xa2bfe8a1, 0xa81a664b, 0xc24b8b70, 0xc76c51a3, 0xd192e819, 0xd6990624, 0xf40e3585, 0x106aa070,
+    0x19a4c116, 0x1e376c08, 0x2748774c, 0x34b0bcb5, 0x391c0cb3, 0x4ed8aa4a, 0x5b9cca4f, 0x682e6ff3,
+    0x748f82ee, 0x78a5636f, 0x84c87814, 0x8cc70208, 0x90befffa, 0xa4506ceb, 0xbef9a3f7, 0xc67178f2]);
+  function sha256(input) {
+    const msg = typeof input === 'string' ? enc.encode(input) : input;
+    const l = msg.length, bitLen = l * 8;
+    const n = ((l + 9 + 63) >> 6) << 6;
+    const buf = new Uint8Array(n);
+    buf.set(msg); buf[l] = 0x80;
+    const dv = new DataView(buf.buffer);
+    dv.setUint32(n - 8, Math.floor(bitLen / 0x100000000)); dv.setUint32(n - 4, bitLen >>> 0);
+    const H = new Uint32Array([0x6a09e667, 0xbb67ae85, 0x3c6ef372, 0xa54ff53a, 0x510e527f, 0x9b05688c, 0x1f83d9ab, 0x5be0cd19]);
+    const W = new Uint32Array(64);
+    for (let off = 0; off < n; off += 64) {
+      for (let i = 0; i < 16; i++) W[i] = dv.getUint32(off + i * 4);
+      for (let i = 16; i < 64; i++) {
+        const a = W[i - 15], b = W[i - 2];
+        const s0 = ((a >>> 7) | (a << 25)) ^ ((a >>> 18) | (a << 14)) ^ (a >>> 3);
+        const s1 = ((b >>> 17) | (b << 15)) ^ ((b >>> 19) | (b << 13)) ^ (b >>> 10);
+        W[i] = (W[i - 16] + s0 + W[i - 7] + s1) | 0;
+      }
+      let [a, b, c, d, e, f, g, h] = H;
+      for (let i = 0; i < 64; i++) {
+        const S1 = ((e >>> 6) | (e << 26)) ^ ((e >>> 11) | (e << 21)) ^ ((e >>> 25) | (e << 7));
+        const ch = (e & f) ^ (~e & g);
+        const t1 = (h + S1 + ch + K[i] + W[i]) | 0;
+        const S0 = ((a >>> 2) | (a << 30)) ^ ((a >>> 13) | (a << 19)) ^ ((a >>> 22) | (a << 10));
+        const mj = (a & b) ^ (a & c) ^ (b & c);
+        const t2 = (S0 + mj) | 0;
+        h = g; g = f; f = e; e = (d + t1) | 0; d = c; c = b; b = a; a = (t1 + t2) | 0;
+      }
+      H[0] += a; H[1] += b; H[2] += c; H[3] += d; H[4] += e; H[5] += f; H[6] += g; H[7] += h;
+    }
+    return Array.from(H, x => (x >>> 0).toString(16).padStart(8, '0')).join('');
+  }
+
+  const utf8 = s => enc.encode(s);
+  const utf8Len = s => enc.encode(s).length;
+  const nfc = s => s.normalize('NFC');
+  const lower = s => s.toLowerCase();               // full Unicode lowercase
+  const stripDiacritics = s => s.normalize('NFD').replace(/\p{Mn}/gu, '');
+  const words = s => stripDiacritics(lower(nfc(s))).split(/[^\p{L}\p{N}]+/u).filter(w => w.length >= 2);
+
+  // --- time ---
+  const pad = (n, w = 2) => String(n).padStart(w, '0');
+  // local parts for a UTC ns timestamp and an offset in minutes
+  function localParts(ns, tzMin) {
+    const d = new Date(Math.floor(ns / 1e6) + tzMin * 60000);
+    return { y: d.getUTCFullYear(), mo: d.getUTCMonth() + 1, d: d.getUTCDate(), h: d.getUTCHours(), mi: d.getUTCMinutes(), s: d.getUTCSeconds() };
+  }
+  function fmtLocal(ns, tzMin, withSec = true) {
+    if (ns == null) return '-';
+    const p = localParts(ns, tzMin);
+    return `${p.y}-${pad(p.mo)}-${pad(p.d)} ${pad(p.h)}:${pad(p.mi)}${withSec ? ':' + pad(p.s) : ''}`;
+  }
+  function tzString(tzMin) {
+    const sign = tzMin < 0 ? '-' : '+'; const a = Math.abs(tzMin);
+    return `${sign}${pad(Math.floor(a / 60))}:${pad(a % 60)}`;
+  }
+  function isoLocal(ns, tzMin) {
+    const p = localParts(ns, tzMin);
+    return `${p.y}-${pad(p.mo)}-${pad(p.d)}T${pad(p.h)}:${pad(p.mi)}:${pad(p.s)}${tzString(tzMin)}`;
+  }
+  // parse "2026-08-07 14:30[:05]" (local) -> utc ns
+  function parseLocal(str, tzMin) {
+    const m = /^(\d{4})-(\d{2})-(\d{2})(?:[ T](\d{2}):(\d{2})(?::(\d{2}))?)?$/.exec(str.trim());
+    if (!m) return null;
+    const ms = Date.UTC(+m[1], +m[2] - 1, +m[3], +(m[4] || 0), +(m[5] || 0), +(m[6] || 0)) - tzMin * 60000;
+    return ms * 1e6;
+  }
+  // "90s" "5m" "2h" "1d" "-1h" -> ns
+  function parseDuration(str) {
+    const m = /^([+-]?\d+(?:\.\d+)?)(ms|s|m|h|d)?$/.exec(String(str).trim());
+    if (!m) return null;
+    const mult = { ms: 1e6, s: 1e9, m: 60e9, h: 3600e9, d: 86400e9 }[m[2] || 's'];
+    return Number(m[1]) * mult;
+  }
+  function fmtSize(n) {
+    if (n < 1024) return n + ' B';
+    if (n < 1024 * 1024) return (n / 1024).toFixed(1) + ' KB';
+    return (n / 1024 / 1024).toFixed(1) + ' MB';
+  }
+  // deterministic PRNG for generated content
+  function rng(seed) {
+    let h = 1779033703 ^ String(seed).length;
+    for (const c of String(seed)) { h = Math.imul(h ^ c.charCodeAt(0), 3432918353); h = (h << 13) | (h >>> 19); }
+    return () => { h = Math.imul(h ^ (h >>> 16), 2246822507); h = Math.imul(h ^ (h >>> 13), 3266489909); h ^= h >>> 16; return (h >>> 0) / 4294967296; };
+  }
+  function ext(name) { const i = name.lastIndexOf('.'); return i > 0 ? name.slice(i + 1) : ''; }
+  function stem(name) { const i = name.lastIndexOf('.'); return i > 0 ? name.slice(0, i) : name; }
+
+  G.U = { sha256, utf8, utf8Len, nfc, lower, stripDiacritics, words, localParts, fmtLocal, isoLocal, tzString, parseLocal, parseDuration, fmtSize, rng, pad, ext, stem };
+})(typeof window !== 'undefined' ? window : globalThis);
+
+</script>
+<script>
+// Mock unix-like kernel: volumes, inodes, mounts, clock, timezone, advisory locks, processes.
+// Classic script, attaches to globalThis.OS.
+(function (G) {
+  'use strict';
+  const U = G.U;
+
+  class OSError extends Error {
+    constructor(code, msg, path) { super(`${code}: ${msg}${path != null ? ` '${path}'` : ''}`); this.code = code; this.path = path; }
+  }
+
+  // Filesystem behaviour profiles. `step` = mtime granularity in ns, `local` = stores local wall time,
+  // `cs` = case-sensitive names (here: byte-exact names), `nfd` = stores names decomposed (HFS+).
+  const FS_PROFILES = {
+    apfs:      { fstypename: 'apfs',  step: 1,   local: false, cs: false, label: 'APFS' },
+    'apfs-cs': { fstypename: 'apfs',  step: 1,   local: false, cs: true,  label: 'APFS (case-sensitive; demo: byte-exact names)' },
+    hfs:       { fstypename: 'hfs',   step: 1e9, local: false, cs: false, nfd: true, label: 'Mac OS Extended (stores names as NFD)' },
+    exfat:     { fstypename: 'exfat', step: 1e7, local: true,  cs: false, label: 'ExFAT (local time, 10 ms)' },
+    msdos:     { fstypename: 'msdos', step: 2e9, local: true,  cs: false, label: 'MS-DOS FAT32 (local time, 2 s)' },
+    smbfs:     { fstypename: 'smbfs', step: 1e9, local: false, cs: false, label: 'SMB share (1 s)' },
+  };
+
+  function splitPath(p) { return p.split('/').filter(c => c && c !== '.'); }
+  // lexical normalisation; cwd used for relative paths
+  function normPath(p, cwd = '/') {
+    if (p == null || p === '') return cwd;
+    const parts = p.startsWith('/') ? [] : splitPath(cwd);
+    for (const c of splitPath(p)) { if (c === '..') parts.pop(); else parts.push(c); }
+    return '/' + parts.join('/');
+  }
+  function dirname(p) { const i = p.lastIndexOf('/'); return i <= 0 ? '/' : p.slice(0, i); }
+  function basename(p) { return p.slice(p.lastIndexOf('/') + 1); }
+  function join(a, b) { return a === '/' ? '/' + b : a + '/' + b; }
+
+  class Volume {
+    constructor(k, { name, fs = 'apfs', removable = true }) {
+      if (!FS_PROFILES[fs]) throw new OSError('EINVAL', `unknown filesystem type ${fs}`);
+      this.k = k; this.id = ++k.volSeq; this.name = name; this.fs = fs; this.prof = FS_PROFILES[fs];
+      this.removable = removable; this.mountedAt = null; this.inoSeq = 1;
+      this.root = k._newNode(this, 'dir', '');
+      this.root.ino = 2;
+    }
+    key(name) { return this.prof.cs ? name : U.lower(U.nfc(name)); }
+    store(name) { return this.prof.nfd ? name.normalize('NFD') : name; }
+    encodeTime(utc) {
+      if (utc == null) return null;
+      const t = this.prof.local ? utc + this.k.tzMin * 60e9 : utc;
+      return Math.floor(t / this.prof.step) * this.prof.step;
+    }
+    decodeTime(raw) { return raw == null ? null : (this.prof.local ? raw - this.k.tzMin * 60e9 : raw); }
+  }
+
+  class Kernel {
+    constructor(opts = {}) {
+      this.hostname = opts.hostname || 'MacBook-Prokop';
+      this.tzMin = opts.tzMin ?? 60;                         // Europe/Prague in November
+      this.realtime = !!opts.realtime;
+      this.t = opts.start ?? Date.parse('2026-11-11T13:02:11Z') * 1e6;
+      this._lastReal = Date.now();
+      this.io = { reads: 0, bytes: 0, media: 0 };
+      this.volSeq = 0; this.volumes = []; this.locks = new Map(); this.procs = new Map(); this.pidSeq = 4100;
+      this.faults = {};                                      // test hooks
+      this.listeners = [];
+      if (!opts.empty) this._boot();
+    }
+    _boot() {
+      const v = new Volume(this, { name: 'Macintosh HD', fs: 'apfs', removable: false });
+      v.mountedAt = '/'; this.rootVol = v; this.volumes.push(v);
+      for (const d of ['/Users/prokop/Desktop', '/Users/prokop/Pictures', '/Users/prokop/.config/asscat', '/Volumes', '/tmp'])
+        this.mkdir(d, { p: true });
+    }
+    // ---------- clock ----------
+    now() {
+      if (this.realtime) { const r = Date.now(); this.t += Math.max(0, r - this._lastReal) * 1e6; this._lastReal = r; }
+      this.t += 1000; return this.t;
+    }
+    advance(ns) { this.t += ns; }
+    nowS() { return Math.floor(this.now() / 1e9); }
+
+    _newNode(vol, type, name) {
+      const t = vol.encodeTime(this.t);
+      return { ino: vol.inoSeq++ + 2, type, name, vol, parent: null, children: type === 'dir' ? new Map() : null,
+               data: type === 'file' ? '' : null, mode: type === 'dir' ? 0o755 : 0o644,
+               mtime: t, ctime: t, atime: t, btime: t, target: null, mount: null };
+    }
+    // ---------- path resolution ----------
+    _enter(node) { return node.mount ? node.mount.root : node; }
+    _lookup(path, noEnterLast = false) {
+      let node = this.rootVol.root;
+      const parts = splitPath(normPath(path));
+      for (let i = 0; i < parts.length; i++) {
+        if (node.type !== 'dir') throw new OSError('ENOTDIR', 'not a directory', path);
+        const ch = node.children.get(node.vol.key(parts[i]));
+        if (!ch) return null;
+        node = noEnterLast && i === parts.length - 1 ? ch : this._enter(ch);
+      }
+      return node;
+    }
+    _need(path) { const n = this._lookup(path); if (!n) throw new OSError('ENOENT', 'no such file or directory', path); return n; }
+    _parentOf(path) {
+      path = normPath(path);
+      if (path === '/') throw new OSError('EINVAL', 'invalid argument', path);
+      const dir = this._need(dirname(path));
+      if (dir.type !== 'dir') throw new OSError('ENOTDIR', 'not a directory', dirname(path));
+      return { dir, name: basename(path) };
+    }
+    _touchDir(dir) { const t = dir.vol.encodeTime(this.now()); dir.mtime = t; dir.ctime = t; }
+    _insert(dir, node) { node.parent = dir; dir.children.set(dir.vol.key(node.name), node); this._touchDir(dir); }
+    _remove(node) { node.parent.children.delete(node.vol.key(node.name)); this._touchDir(node.parent); node.parent = null; }
+    _changed() { for (const f of this.listeners) try { f(); } catch (e) { /* ignore */ } }
+
+    // ---------- syscalls ----------
+    exists(path) { try { return !!this._lookup(path); } catch { return false; } }
+    stat(path) {
+      const n = this._need(path), v = n.vol;
+      return {
+        type: n.type, ino: n.ino, mode: n.mode, size: n.type === 'file' ? U.utf8Len(n.data) : (n.type === 'dir' ? n.children.size : n.target.length),
+        mtime_ns: v.decodeTime(n.mtime), atime_ns: v.decodeTime(n.atime), btime_ns: v.decodeTime(n.btime),
+        ctime_ns: v.prof.local ? null : n.ctime, dev: v.id, volume: v.name, name: n.name, target: n.target,
+      };
+    }
+    readdir(path) {
+      const n = this._need(path);
+      if (n.type !== 'dir') throw new OSError('ENOTDIR', 'not a directory', path);
+      if (!(n.mode & 0o444)) throw new OSError('EACCES', 'permission denied', path);
+      return [...n.children.values()].map(c => c.name).sort((a, b) => (a < b ? -1 : a > b ? 1 : 0));
+    }
+    _readable(n, path) {
+      if (n.type === 'dir') throw new OSError('EISDIR', 'is a directory', path);
+      if (n.type !== 'file') throw new OSError('EINVAL', 'not a regular file', path);
+      if (!(n.mode & 0o444)) throw new OSError('EACCES', 'permission denied', path);
+      if (this.faults.readError && this.faults.readError(path)) throw new OSError('EIO', 'input/output error', path);
+    }
+    readFile(path) {
+      const n = this._need(path); this._readable(n, path);
+      n.atime = n.vol.encodeTime(this.now());
+      this.io.reads++; this.io.bytes += U.utf8Len(n.data);
+      if (!/\/\./.test(normPath(path))) this.io.media++;
+      if (this.trace) this.trace('read', normPath(path));
+      return n.data;
+    }
+    // read selected byte ranges (used by partial hashing); counts as one read
+    readRanges(path, ranges) {
+      const n = this._need(path); this._readable(n, path);
+      const bytes = U.utf8(n.data); const out = [];
+      for (const [off, len] of ranges) { out.push(bytes.slice(off, off + len)); this.io.bytes += Math.min(len, Math.max(0, bytes.length - off)); }
+      this.io.reads++; n.atime = n.vol.encodeTime(this.now());
+      if (!/\/\./.test(normPath(path))) this.io.media++;
+      if (this.trace) this.trace('read', normPath(path));
+      return out;
+    }
+    writeFile(path, data, opts = {}) {
+      path = normPath(path);
+      let n = this._lookup(path);
+      const t = this.now();
+      if (n) {
+        if (n.type !== 'file') throw new OSError('EISDIR', 'is a directory', path);
+        if (!(n.mode & 0o222)) throw new OSError('EACCES', 'permission denied', path);
+        n.data = String(data);
+      } else {
+        const { dir, name } = this._parentOf(path);
+        if (opts.exclusive === false) { /* fine */ }
+        n = this._newNode(dir.vol, 'file', dir.vol.store(name)); n.data = String(data);
+        n.btime = dir.vol.encodeTime(opts.btime ?? t);
+        this._insert(dir, n);
+      }
+      n.mtime = n.vol.encodeTime(opts.mtime ?? t); n.ctime = n.vol.encodeTime(t); n.atime = n.vol.encodeTime(t);
+      this._changed();
+      return n;
+    }
+    mkdir(path, opts = {}) {
+      path = normPath(path);
+      if (opts.p) {
+        let cur = '/';
+        for (const c of splitPath(path)) {
+          cur = join(cur, c);
+          const n = this._lookup(cur);
+          if (n) { if (n.type !== 'dir') throw new OSError('EEXIST', 'file exists', cur); continue; }
+          this.mkdir(cur);
+        }
+        return;
+      }
+      const { dir, name } = this._parentOf(path);
+      if (dir.children.has(dir.vol.key(name))) throw new OSError('EEXIST', 'file exists', path);
+      this._insert(dir, this._newNode(dir.vol, 'dir', dir.vol.store(name)));
+      this._changed();
+    }
+    symlink(target, path) {
+      const { dir, name } = this._parentOf(path);
+      if (dir.children.has(dir.vol.key(name))) throw new OSError('EEXIST', 'file exists', path);
+      const n = this._newNode(dir.vol, 'link', dir.vol.store(name)); n.target = target;
+      this._insert(dir, n); this._changed();
+    }
+    unlink(path) {
+      const n = this._need(path);
+      if (n.type === 'dir') throw new OSError('EISDIR', 'is a directory', path);
+      this._remove(n); this._changed();
+    }
+    rmdir(path) {
+      const n = this._need(path);
+      if (n.type !== 'dir') throw new OSError('ENOTDIR', 'not a directory', path);
+      if (n.vol.root === n || n.mount) throw new OSError('EBUSY', 'resource busy', path);
+      if (n.children.size) throw new OSError('ENOTEMPTY', 'directory not empty', path);
+      this._remove(n); this._changed();
+    }
+    rmTree(path) {
+      const n = this._need(path);
+      if (n.type === 'dir') {
+        if (n.mount || n.vol.root === n) throw new OSError('EBUSY', 'resource busy (mount point)', path);
+        for (const c of [...n.children.values()]) this.rmTree(join(normPath(path), c.name));
+        this.rmdir(path);
+      } else this.unlink(path);
+    }
+    // POSIX rename; noReplace = RENAME_EXCL (the app's rename_new never overwrites)
+    rename(from, to, opts = {}) {
+      from = normPath(from); to = normPath(to);
+      const src = this._need(from);
+      if (src.vol.root === src || src.mount) throw new OSError('EBUSY', 'resource busy', from);
+      const { dir, name } = this._parentOf(to);
+      if (dir.vol !== src.vol) throw new OSError('EXDEV', 'cross-device link', to);
+      for (let p = dir; p; p = p.parent) if (p === src) throw new OSError('EINVAL', 'cannot move a directory into itself', to);
+      const existing = dir.children.get(dir.vol.key(name));
+      if (existing === src) {                            // only the spelling changes (case / NFC-NFD)
+        this._remove(src); src.name = dir.vol.store(name); this._insert(dir, src);
+        src.ctime = src.vol.encodeTime(this.now()); this._changed(); return;
+      }
+      if (existing) {
+        if (opts.noReplace) throw new OSError('EEXIST', 'file exists', to);
+        if (existing.type === 'dir') {
+          if (src.type !== 'dir') throw new OSError('EISDIR', 'is a directory', to);
+          if (existing.children.size) throw new OSError('ENOTEMPTY', 'directory not empty', to);
+        } else if (src.type === 'dir') throw new OSError('ENOTDIR', 'not a directory', to);
+        this._remove(existing);
+      }
+      this._remove(src); src.name = dir.vol.store(name); this._insert(dir, src);
+      src.ctime = src.vol.encodeTime(this.now());
+      this._changed();
+    }
+    utimes(path, mtime_ns) { const n = this._need(path); n.mtime = n.vol.encodeTime(mtime_ns); n.ctime = n.vol.encodeTime(this.now()); this._changed(); }
+    chmod(path, mode) { const n = this._need(path); n.mode = mode; n.ctime = n.vol.encodeTime(this.now()); this._changed(); }
+    statfs(path) {
+      const n = this._need(path); const v = n.vol;
+      return { f_fstypename: v.prof.fstypename, f_mntonname: v.mountedAt, volume: v.name, fs: v.fs, label: v.prof.label, removable: v.removable };
+    }
+    // copy file (Finder-like: preserves mtime when preserve=true); works across volumes
+    copyFile(from, to, opts = {}) {
+      const st = this.stat(from);
+      const data = this.readFile(from);
+      if (opts.noReplace && this.exists(to)) throw new OSError('EEXIST', 'file exists', to);
+      this.writeFile(to, data, { mtime: opts.preserve ? st.mtime_ns : undefined, btime: opts.preserve ? st.btime_ns : undefined });
+    }
+
+    // ---------- disks ----------
+    disks() { return this.volumes.map(v => ({ name: v.name, fs: v.fs, label: v.prof.label, mountedAt: v.mountedAt, removable: v.removable })); }
+    createDisk({ name, fs = 'exfat' }) {
+      if (!name || name.includes('/')) throw new OSError('EINVAL', 'bad disk name');
+      const v = new Volume(this, { name, fs, removable: true });
+      this.volumes.push(v); this.mountDisk(v.name); return v;
+    }
+    _vol(name) {
+      const v = this.volumes.find(x => x.name === name) || this.volumes.find(x => x.mountedAt === normPath(name));
+      if (!v) throw new OSError('ENOENT', 'no such disk', name);
+      return v;
+    }
+    mountDisk(name) {
+      const v = this._vol(name);
+      if (v.mountedAt) throw new OSError('EBUSY', 'already mounted', v.mountedAt);
+      let mp = '/Volumes/' + v.name, i = 1;
+      while (this.exists(mp)) mp = `/Volumes/${v.name} ${i++}`;
+      this.mkdir(mp);
+      const node = this._lookup(mp); node.mount = v; v.mountedAt = mp; v.root.parent = node.parent;
+      this._changed(); return mp;
+    }
+    ejectDisk(name) {
+      const v = this._vol(name);
+      if (!v.removable) throw new OSError('EBUSY', 'cannot eject the startup disk');
+      if (!v.mountedAt) throw new OSError('EINVAL', 'not mounted', name);
+      for (const [key, pid] of this.locks) if (key.startsWith(v.id + ':') && this.procs.has(pid))
+        throw new OSError('EBUSY', `disk is in use by pid ${pid}`, v.mountedAt);
+      const node = this._lookup(v.mountedAt, true); node.mount = null;
+      this.rmdir(v.mountedAt); v.mountedAt = null; v.root.parent = null;
+      this._changed();
+    }
+    destroyDisk(name) { const v = this._vol(name); if (v.mountedAt) this.ejectDisk(name); this.volumes = this.volumes.filter(x => x !== v); this._changed(); }
+
+    // ---------- processes & advisory locks (flock) ----------
+    spawn(name, opts = {}) { const pid = ++this.pidSeq; this.procs.set(pid, { pid, name, host: opts.host || this.hostname, started: this.t }); return pid; }
+    exit(pid) { this.procs.delete(pid); for (const [k, p] of [...this.locks]) if (p === pid) this.locks.delete(k); this._changed(); }
+    flock(path, pid) {
+      const n = this._need(path); const key = n.vol.id + ':' + n.ino;
+      const holder = this.locks.get(key);
+      if (holder != null && holder !== pid && this.procs.has(holder)) return false;
+      this.locks.set(key, pid); return true;
+    }
+
+    // ---------- persistence ----------
+    toJSON() {
+      const ser = n => {
+        const o = { n: n.name, t: n.type, i: n.ino, m: n.mode, mt: n.mtime, ct: n.ctime, at: n.atime, bt: n.btime };
+        if (n.type === 'file') o.d = n.data;
+        if (n.type === 'link') o.tg = n.target;
+        if (n.type === 'dir') o.c = [...n.children.values()].map(ser);
+        return o;
+      };
+      return { v: 1, t: this.t, tzMin: this.tzMin, hostname: this.hostname, volSeq: this.volSeq, pidSeq: this.pidSeq,
+               volumes: this.volumes.map(v => ({ id: v.id, name: v.name, fs: v.fs, removable: v.removable, mountedAt: v.mountedAt, inoSeq: v.inoSeq, root: ser(v.root) })) };
+    }
+    static fromJSON(j, opts = {}) {
+      const k = new Kernel({ ...opts, empty: true, start: j.t, tzMin: j.tzMin, hostname: j.hostname });
+      k.volSeq = j.volSeq; k.pidSeq = j.pidSeq;
+      const de = (vol, o, parent) => {
+        const n = { ino: o.i, type: o.t, name: o.n, vol, parent, children: o.t === 'dir' ? new Map() : null, data: o.d ?? null,
+                    mode: o.m, mtime: o.mt, ctime: o.ct, atime: o.at, btime: o.bt, target: o.tg ?? null, mount: null };
+        if (o.c) for (const c of o.c) n.children.set(vol.key(c.n), de(vol, c, n));
+        return n;
+      };
+      for (const vj of j.volumes) {
+        const v = Object.create(Volume.prototype);
+        Object.assign(v, { k, id: vj.id, name: vj.name, fs: vj.fs, prof: FS_PROFILES[vj.fs], removable: vj.removable, mountedAt: null, inoSeq: vj.inoSeq });
+        v.root = de(v, vj.root, null); v._mp = vj.mountedAt;
+        k.volumes.push(v); if (vj.mountedAt === '/') { k.rootVol = v; v.mountedAt = '/'; }
+      }
+      for (const v of k.volumes) if (v._mp && v._mp !== '/') {
+        const node = k._lookup(v._mp);
+        if (node) { node.mount = v; v.mountedAt = v._mp; v.root.parent = node.parent; }
+        delete v._mp;
+      }
+      return k;
+    }
+  }
+
+  G.OS = { Kernel, OSError, FS_PROFILES, normPath, dirname, basename, join, splitPath };
+})(typeof window !== 'undefined' ? window : globalThis);
+
+</script>
+<script>
+// Mock content generators: photo series, memory cards. Attaches to globalThis.Gen.
+(function (G) {
+  'use strict';
+  const U = G.U, { join } = G.OS;
+
+  // deterministic fake file body; size grows with `kb`
+  function body(kind, seed, kb = 1) {
+    const r = U.rng(seed);
+    let s = `${kind.toUpperCase()} mock content seed=${seed}\n`;
+    const target = Math.max(64, Math.floor(kb * 1024 * (0.6 + r() * 0.8)));
+    while (s.length < target) s += Math.floor(r() * 1e16).toString(36);
+    return s.slice(0, target);
+  }
+
+  // n photos IMG_0001.JPG... into dir with mtimes start + i*every (+ jitter)
+  function photos(k, dir, n, o = {}) {
+    const start = o.start ?? k.t - 86400e9, every = o.every ?? 60e9;
+    const prefix = o.prefix ?? 'IMG_', ext = o.ext ?? 'JPG', first = o.first ?? 1;
+    k.mkdir(dir, { p: true });
+    const out = [];
+    for (let i = 0; i < n; i++) {
+      const name = `${prefix}${String(first + i).padStart(4, '0')}.${ext}`;
+      const p = join(dir, name);
+      k.writeFile(p, body(ext, `${o.seed ?? dir}:${name}`, o.kb ?? 2), { mtime: start + i * every, btime: start + i * every });
+      out.push(p);
+    }
+    return out;
+  }
+
+  // a camera card: two shoots a couple of days apart, plus a sidecar that the filter skips
+  function card(k, mount, o = {}) {
+    const n1 = o.n1 ?? 6, n2 = o.n2 ?? 4;
+    const base = o.start ?? (k.t - 5 * 86400e9);
+    photos(k, join(mount, 'DCIM/100MSDCF'), n1, { prefix: 'DSC0', start: base, every: 90e9, seed: mount + 'a' });
+    photos(k, join(mount, 'DCIM/100MSDCF'), n2, { prefix: 'DSC0', first: n1 + 1, start: base + 2 * 86400e9, every: 120e9, seed: mount + 'b' });
+    k.mkdir(join(mount, 'PRIVATE/M4ROOT'), { p: true });
+    k.writeFile(join(mount, 'PRIVATE/M4ROOT/MEDIAPRO.XML'), '<xml>card index</xml>');
+    k.writeFile(join(mount, '.Spotlight-V100'), 'x');
+  }
+
+  G.Gen = { body, photos, card };
+})(typeof window !== 'undefined' ? window : globalThis);
+
+</script>
+<script>
+// asscat-cli: the demo app from the spec, running on the mock kernel (src/os.js).
+// The "SQLite database" is an in-memory set of tables persisted as JSON in <root>/.asscat/library.db;
+// every commit() rewrites that file, so anything not committed is lost when the process dies.
+(function (G) {
+  'use strict';
+  const U = G.U, OS = G.OS;
+  const { normPath, dirname, basename, join } = OS;
+
+  class AppError extends Error { constructor(msg, exit = 1) { super(msg); this.exit = exit; } }
+  class UsageError extends AppError { constructor(msg) { super(msg, 2); } }
+  class Crash extends Error { constructor(msg) { super(msg); this.crash = true; } }
+
+  const HASH_ALGO = 'sha256 (demo stand-in for blake3)';
+  const PARTIAL_ALGO = 'sha256-dk:asscat 2026-11-05 partial content hash v1;n=5;len=65536';
+  const USER_VERSION = 1;
+  const MAX_LEVEL_BYTES = 255, MAX_PATH_CHARS = 222;
+  const HISTORY_MAX = 16, BACKUPS_KEEP = 7, JOURNAL_BATCH = 500, HASH_COMMIT = 100;
+  const DEFAULT_SETTINGS = {
+    'edge.same_path': 'auto',
+    'import.after': 'manual',
+    'scan.ignore': ['Thumbs.db', 'desktop.ini', 'Icon\r'],
+    'materialize.locked': [],
+  };
+  const SETTING_CHECK = {
+    'edge.same_path': v => ['auto', 'ask', 'manual'].includes(v),
+    'import.after': v => ['manual', 'auto'].includes(v),
+    'scan.ignore': v => Array.isArray(v) && v.every(x => typeof x === 'string'),
+    'materialize.locked': v => Array.isArray(v) && v.every(x => typeof x === 'string'),
+  };
+  const KIND = {
+    foto: 'jpg jpeg heic heif png tif tiff dng cr2 cr3 nef arw raf orf rw2'.split(' '),
+    video: 'mp4 mov m4v mts m2ts avi mxf braw r3d'.split(' '),
+    zvuk: 'wav mp3 aac m4a flac aif aiff'.split(' '),
+  };
+  const PROJECT_EXT = 'flp als logicx ptx prproj drp aep fcpbundle lrcat cocatalog'.split(' ');
+  const COMPUTED = ['rok', 'mesic', 'datum', 'pripona', 'druh'];
+  const WINDOWS_SYSTEM = ['$recycle.bin', 'system volume information'];
+  const FS_STEP = { msdos: 2e9, exfat: 1e7, smbfs: 1e9, apfs: 1, hfs: 1e9 };
+  const DEFAULT_FILTER = { include_ext: [...KIND.foto, ...KIND.video, ...KIND.zvuk] };
+
+  const nfcLower = s => U.lower(U.nfc(s));
+  const norm_key = k => nfcLower(k.trim());
+  const norm_value = v => nfcLower(v.trim());
+  function bad_folder_name(v) {
+    return /[\/\\:*?"<>|]/.test(v) || v.startsWith('.') || v.endsWith(' ') || v.endsWith('.') || U.utf8Len(v) > MAX_LEVEL_BYTES || v === '';
+  }
+  function druh(ext) { const e = ext.toLowerCase(); for (const k of Object.keys(KIND)) if (KIND[k].includes(e)) return k; return 'ostatni'; }
+  const cmpStr = (a, b) => (a < b ? -1 : a > b ? 1 : 0);
+  const ancestors = p => { const parts = p.split('/'); const out = []; for (let i = 1; i < parts.length; i++) out.push(parts.slice(0, i).join('/')); return out; };
+  const under = (p, folder) => folder === '' || p.startsWith(folder + '/');
+
+  // ---------------------------------------------------------------- database
+  class Db {
+    constructor(j) {
+      this.user_version = j.user_version;
+      this.library = j.tables.library[0] || null;
+      this.seq = j.seq;
+      this.files = new Map(j.tables.files.map(r => [r.id, r]));
+      this.byHash = new Map(j.tables.files.map(r => [r.hash, r.id]));
+      this.paths = new Map(j.tables.paths.map(r => [r.path, r]));
+      this.history = j.tables.path_history;
+      this.tags = j.tables.tags;
+      this.edges = j.tables.edges;
+      this.keywords = new Map();
+      for (const r of j.tables.keywords) { if (!this.keywords.has(r.file_id)) this.keywords.set(r.file_id, new Map()); this.keywords.get(r.file_id).set(r.word, r.weight); }
+      this.settings = Object.fromEntries(j.tables.settings.map(r => [r.key, r.value]));
+      this.views = new Map(j.tables.views.map(r => [r.name, r]));
+      this.ops = j.tables.ops; this.op_steps = j.tables.op_steps;
+    }
+    static empty() {
+      return new Db({ user_version: USER_VERSION, seq: { files: 0, ops: 0 }, tables: { library: [], files: [], paths: [], path_history: [], tags: [], edges: [], keywords: [], settings: [], views: [], ops: [], op_steps: [] } });
+    }
+    static parse(text) {
+      const j = JSON.parse(text);
+      if (!j || j.format !== 'asscat-demo-sqlite' || !j.tables) throw new Error('not an asscat database');
+      return new Db(j);
+    }
+    dump() {
+      const kw = [];
+      for (const [fid, m] of this.keywords) for (const [word, weight] of m) kw.push({ word, file_id: fid, weight });
+      return JSON.stringify({
+        format: 'asscat-demo-sqlite', user_version: this.user_version, seq: this.seq,
+        tables: {
+          library: this.library ? [this.library] : [], files: [...this.files.values()], paths: [...this.paths.values()],
+          path_history: this.history, tags: this.tags, edges: this.edges, keywords: kw,
+          settings: Object.entries(this.settings).map(([key, value]) => ({ key, value })),
+          views: [...this.views.values()], ops: this.ops, op_steps: this.op_steps,
+        },
+      });
+    }
+    table(name) {
+      const t = JSON.parse(this.dump()).tables;
+      if (!(name in t)) throw new UsageError(`unknown table ${name}; tables: ${Object.keys(t).join(', ')}`);
+      return t[name];
+    }
+  }
+
+  // ---------------------------------------------------------------- library
+  class Library {
+    constructor(app, root) {
+      this.app = app; this.k = app.k; this.root = normPath(root);
+      this.dir = join(this.root, '.asscat'); this.dbPath = join(this.dir, 'library.db');
+      this.lockPath = join(this.dir, 'lock');
+    }
+    abs(rel) { return rel ? join(this.root, rel) : this.root; }
+    err(s) { this.app.err(s); }
+    commit() { this.k.writeFile(this.dbPath, this.db.dump()); }
+    setting(key) { return key in this.db.settings ? JSON.parse(this.db.settings[key]) : JSON.parse(JSON.stringify(DEFAULT_SETTINGS[key])); }
+    nowS() { return this.k.nowS(); }
+    path_key(p) { const k = U.nfc(p); return this.db.library.fs_case_sensitive ? k : U.lower(k); }
+
+    // 4.1
+    open(opts = {}) {
+      const k = this.k;
+      if (!k.exists(this.root) || k.stat(this.root).type !== 'dir') throw new AppError(`library folder not found: ${this.root}`);
+      const dbExists = k.exists(this.dbPath);
+      const mayCreate = opts.startOver || opts.unknownFolder;
+      const missingMsg = 'library database is missing or damaged; run "library open <folder> --start-over" to create a new empty one (tags and history are lost)';
+      if (!dbExists && !mayCreate) throw new AppError(missingMsg);
+      k.mkdir(this.dir, { p: true });
+      this.lock();
+      let db = null, created = false;
+      if (dbExists && !opts.startOver) {
+        try { db = Db.parse(k.readFile(this.dbPath)); } catch (e) { throw new AppError(missingMsg); }
+        if (db.user_version > USER_VERSION) throw new AppError('library database is newer than this program; upgrade asscat');
+      } else {
+        if (dbExists) {                                     // --start-over: keep the old file aside, never delete it
+          const aside = `${this.dbPath}.old-${U.fmtLocal(k.now(), k.tzMin).replace(/[ :]/g, '-')}`;
+          k.rename(this.dbPath, aside); this.err(`old database kept as ${aside}`);
+        }
+        db = Db.empty(); created = true;
+        const r = U.rng(String(k.now()) + this.root);
+        db.library = {
+          id: 1, uuid: Array.from({ length: 16 }, () => Math.floor(r() * 256).toString(16).padStart(2, '0')).join(''),
+          name: basename(this.root) || this.root, created_at: this.nowS(), hash_algo: HASH_ALGO, partial_algo: PARTIAL_ALGO,
+          fs_type: null, fs_case_sensitive: 0, fs_mtime_step_ns: 1, fs_mtime_local: 0, fs_seen_at: null,
+        };
+      }
+      this.db = db; this.created = created;
+      if (created) this.commit();
+      this.detect_fs();
+      this.daily_backup();
+      this.recover_ops();
+      this.lastSync = this.sync('fast');
+      return this;
+    }
+    // 4.8
+    lock() {
+      const k = this.k;
+      if (!k.exists(this.lockPath)) k.writeFile(this.lockPath, '');
+      if (!k.flock(this.lockPath, this.app.pid)) {
+        let h = null;
+        try { h = JSON.parse(k.readFile(this.lockPath)); } catch { /* unreadable */ }
+        if (h && h.host && h.pid && h.since) {
+          const since = h.since.replace('T', ' ').slice(0, 16);
+          throw new AppError(`the library is in use by asscat on ${h.host} since ${since} (pid ${h.pid})`);
+        }
+        throw new AppError('the library is in use by another asscat process');
+      }
+      const proc = k.procs.get(this.app.pid);
+      k.writeFile(this.lockPath, JSON.stringify({ host: proc ? proc.host : k.hostname, pid: this.app.pid, since: U.isoLocal(k.now(), k.tzMin) }));
+    }
+    // 4.3
+    detect_fs() {
+      const k = this.k, lib = this.db.library;
+      const fs_type = k.statfs(this.root).f_fstypename;
+      const probe = join(this.dir, 'CaseProbe');
+      k.writeFile(probe, 'probe');
+      const cs = !k.exists(join(this.dir, 'caseprobe'));
+      k.unlink(probe);
+      const changed = !!lib.fs_case_sensitive !== cs;
+      Object.assign(lib, { fs_type, fs_case_sensitive: cs ? 1 : 0, fs_mtime_step_ns: FS_STEP[fs_type] ?? 1e9, fs_mtime_local: ['msdos', 'exfat'].includes(fs_type) ? 1 : 0, fs_seen_at: this.nowS() });
+      if (changed) for (const r of this.db.paths.values()) r.path_key = this.path_key(r.path);
+      this.commit();
+    }
+    // 4.9
+    backup(name) {
+      const k = this.k, dir = join(this.dir, 'backups');
+      k.mkdir(dir, { p: true });
+      this.commit();
+      k.writeFile(join(dir, name), k.readFile(this.dbPath));
+      const all = k.readdir(dir).filter(n => /^library-.*\.db$/.test(n)).sort().reverse();
+      for (const old of all.slice(BACKUPS_KEEP)) k.unlink(join(dir, old));
+    }
+    daily_backup() {
+      const p = U.localParts(this.k.now(), this.k.tzMin);
+      const name = `library-${p.y}-${U.pad(p.mo)}-${U.pad(p.d)}.db`;
+      const dir = join(this.dir, 'backups');
+      if (this.k.exists(join(dir, name))) return;
+      this.backup(name);
+    }
+    // 4.4
+    same_mtime(a, b) {
+      const lib = this.db.library;
+      if (a == null || b == null) return a == b;
+      const d = Math.abs(a - b);
+      if (d <= lib.fs_mtime_step_ns) return true;
+      if (!lib.fs_mtime_local) return false;
+      const STEP = 15 * 60e9, MAX = 26 * 3600e9;
+      if (d > MAX + lib.fs_mtime_step_ns) return false;
+      const r = d % STEP;
+      return r <= lib.fs_mtime_step_ns || STEP - r <= lib.fs_mtime_step_ns;
+    }
+
+    // ---------- scanning & hashing ----------
+    scan_dir(ignore) {
+      const k = this.k, out = { files: [], hidden: [], links: [], ignored: [], errors: [] };
+      const ign = new Set(ignore.map(nfcLower));
+      const walk = (rel) => {
+        let names;
+        try { names = k.readdir(this.abs(rel)); } catch (e) { out.errors.push({ path: rel, error: e.message }); return; }
+        for (const name of names) {
+          const p = rel ? rel + '/' + name : name;
+          if (/[\uD800-\uDFFF]/.test(name.replace(/[\uD800-\uDBFF][\uDC00-\uDFFF]/g, ''))) { out.errors.push({ path: p, error: 'name is not valid UTF-8' }); continue; }
+          if (name.startsWith('.')) { if (p !== '.asscat') out.hidden.push(p); continue; }
+          if (WINDOWS_SYSTEM.includes(name.toLowerCase())) { out.hidden.push(p); continue; }
+          if (ign.has(nfcLower(name))) { out.ignored.push(p); continue; }
+          const st = k.stat(this.abs(p));
+          if (st.type === 'link') { out.links.push(p); continue; }
+          if (st.type === 'dir') { walk(p); continue; }
+          out.files.push({ path: p, name, size: st.size, mtime_ns: st.mtime_ns, ctime_ns: st.ctime_ns, atime_ns: st.atime_ns, btime_ns: st.btime_ns });
+        }
+      };
+      walk('');
+      return out;
+    }
+    remove_leftover_parts() {
+      const k = this.k; let n = 0;
+      const walk = (abs) => {
+        for (const name of k.readdir(abs)) {
+          const p = join(abs, name);
+          if (name === '.asscat') continue;
+          const st = k.stat(p);
+          if (st.type === 'dir') walk(p);
+          else if (name.endsWith('.asscat-part')) { k.unlink(p); n++; }
+        }
+      };
+      walk(this.root);
+      if (n) this.err(`removed ${n} leftover part file(s) from an interrupted import`);
+    }
+    hash_partial(rel) { return Library.hashPartialAbs(this.k, this.abs(rel)); }
+    static hashPartialAbs(k, abs) {
+      const size = k.stat(abs).size, LEN = 65536, N = 5;
+      const ranges = size <= N * LEN ? [[0, size]] : Array.from({ length: N }, (_, i) => [Math.floor(i * (size - LEN) / (N - 1)), LEN]);
+      const parts = k.readRanges(abs, ranges);
+      const head = U.utf8(`${PARTIAL_ALGO}|${size}|`);
+      const all = new Uint8Array(head.length + parts.reduce((a, p) => a + p.length, 0));
+      all.set(head); let o = head.length; for (const p of parts) { all.set(p, o); o += p.length; }
+      return U.sha256(all);
+    }
+    static hashFullAbs(k, abs) { return U.sha256(k.readFile(abs)); }
+    // partial + full; null when the file changed under us
+    hash_unchanged(row) {
+      const abs = this.abs(row.path);
+      const st = this.k.stat(abs);
+      if (st.size !== row.size || !this.same_mtime(st.mtime_ns, row.mtime_ns)) return null;
+      const partial = Library.hashPartialAbs(this.k, abs);
+      const full = Library.hashFullAbs(this.k, abs);
+      const st2 = this.k.stat(abs);
+      if (st2.size !== st.size || st2.mtime_ns !== st.mtime_ns) return null;
+      return { partial, full };
+    }
+    // 4.5
+    sync(mode = 'fast') {
+      const now = this.nowS(), db = this.db;
+      const report = { mode, listed: 0, new: 0, unchanged: 0, changed: 0, respelled: 0, moved: 0, moved_folders: 0, moved_pending: 0, gone: 0, hashed: 0, errors: [], skipped: {} };
+      this.remove_leftover_parts();
+      const scan = this.scan_dir(this.setting('scan.ignore'));
+      const listed = scan.files; report.listed = listed.length;
+      report.skipped = { hidden: scan.hidden, links: scan.links, ignored: scan.ignored };
+      report.errors.push(...scan.errors);
+      const rows = db.paths;
+      const marks = new Map(); const used = new Set();
+      const mark = (e, kind, r) => { marks.set(e.path, { kind, r }); if (r) used.add(r.path); };
+      const touched = new Set();
+
+      // 1. exact path
+      for (const e of listed) {
+        const r = rows.get(e.path); if (!r) continue;
+        mark(e, r.size === e.size && this.same_mtime(r.mtime_ns, e.mtime_ns) ? 'unchanged' : 'changed', r);
+      }
+      // 2. other spelling of the same path
+      const byKey = new Map();
+      for (const r of rows.values()) if (!used.has(r.path)) { const kk = this.path_key(r.path); if (!byKey.has(kk)) byKey.set(kk, []); byKey.get(kk).push(r); }
+      for (const e of listed) {
+        if (marks.has(e.path)) continue;
+        const cands = (byKey.get(this.path_key(e.path)) || []).filter(r => !used.has(r.path));
+        if (cands.length === 1 && cands[0].size === e.size && this.same_mtime(cands[0].mtime_ns, e.mtime_ns)) mark(e, 'respelled', cands[0]);
+      }
+      // 3. whole-folder move (no reading)
+      {
+        const gone = [...rows.values()].filter(r => !used.has(r.path));
+        const fresh = listed.filter(e => !marks.has(e.path));
+        const tops = (all, subset) => {
+          const total = new Map(), part = new Map();
+          for (const x of all) for (const f of ancestors(x.path)) total.set(f, (total.get(f) || 0) + 1);
+          for (const x of subset) for (const f of ancestors(x.path)) part.set(f, (part.get(f) || 0) + 1);
+          const q = new Set([...part.keys()].filter(f => part.get(f) === total.get(f)));
+          return [...q].filter(f => !q.has(dirname('/' + f).slice(1)) || !f.includes('/'));
+        };
+        const sig = (F, items) => {
+          const lines = items.filter(x => under(x.path, F)).map(x => `${x.path.slice(F.length + 1)}\t${x.size}\t${x.mtime_ns}`).sort(cmpStr);
+          return lines.length >= 2 ? U.sha256(lines.join('\n')) : null;
+        };
+        const goneTops = tops([...rows.values()], gone), freshTops = tops(listed, fresh);
+        const goneSig = new Map(), freshSig = new Map();
+        for (const F of goneTops) { const s = sig(F, gone); if (s) { if (!goneSig.has(s)) goneSig.set(s, []); goneSig.get(s).push(F); } }
+        for (const F of freshTops) { const s = sig(F, fresh); if (s) { if (!freshSig.has(s)) freshSig.set(s, []); freshSig.get(s).push(F); } }
+        for (const [s, Gs] of goneSig) {
+          const Ns = freshSig.get(s);
+          if (Gs.length !== 1 || !Ns || Ns.length !== 1) continue;
+          const Gf = Gs[0], N = Ns[0];
+          for (const e of fresh) if (under(e.path, N)) {
+            const r = rows.get(Gf + '/' + e.path.slice(N.length + 1));
+            if (r && !used.has(r.path)) mark(e, r.file_id == null ? 'moved_pending' : 'moved_folder', r);
+          }
+          report.moved_folders++;
+        }
+      }
+      // 4. single-file move
+      {
+        const byTriple = new Map(), dup = new Set();
+        for (const r of rows.values()) if (!used.has(r.path)) {
+          const key = `${basename('/' + r.path)}\u0000${r.size}\u0000${r.mtime_ns}`;
+          if (byTriple.has(key)) dup.add(key); else byTriple.set(key, r);
+        }
+        for (const d of dup) byTriple.delete(d);
+        for (const e of listed) {
+          if (marks.has(e.path)) continue;
+          const key = `${e.name}\u0000${e.size}\u0000${e.mtime_ns}`;
+          const r = byTriple.get(key); if (!r || used.has(r.path)) continue;
+          if (r.file_id == null) { mark(e, 'moved_pending', r); continue; }
+          let ph; try { ph = this.hash_partial(e.path); } catch (err) { continue; }
+          if (ph === db.files.get(r.file_id).partial_hash) mark(e, 'moved', r);
+        }
+      }
+      // 5. write (one transaction)
+      const newRow = (e, extra) => ({
+        path: e.path, path_key: this.path_key(e.path), file_id: null, size: e.size, mtime_ns: e.mtime_ns, ctime_ns: e.ctime_ns,
+        atime_ns: e.atime_ns, btime_ns: e.btime_ns, first_seen: now, last_full_check: null, changed_from: null, prev_path: null, read_error: null, ...extra,
+      });
+      const times = (r, e) => { r.ctime_ns = e.ctime_ns; r.atime_ns = e.atime_ns; r.btime_ns = e.btime_ns; };
+      for (const e of listed) {
+        const m = marks.get(e.path);
+        if (!m) { rows.set(e.path, newRow(e)); report.new++; continue; }
+        const r = m.r;
+        switch (m.kind) {
+          case 'unchanged': times(r, e); report.unchanged++; break;
+          case 'respelled':
+            rows.delete(r.path); r.path = e.path; r.path_key = this.path_key(e.path); times(r, e); rows.set(e.path, r);
+            if (r.file_id) touched.add(r.file_id); report.respelled++; break;
+          case 'changed':
+            Object.assign(r, { size: e.size, mtime_ns: e.mtime_ns, changed_from: r.file_id ?? r.changed_from, file_id: null, last_full_check: null });
+            times(r, e); report.changed++; break;
+          case 'moved': case 'moved_folder':
+            rows.delete(r.path);
+            rows.set(e.path, newRow(e, { file_id: r.file_id }));
+            this.add_history(r.file_id, r.path, now); touched.add(r.file_id);
+            report.moved++; break;
+          case 'moved_pending':
+            rows.delete(r.path);
+            rows.set(e.path, newRow(e, { prev_path: r.prev_path ?? r.path, changed_from: r.changed_from }));
+            report.moved_pending++; break;
+        }
+      }
+      const listedSet = new Set(listed.map(e => e.path));
+      for (const r of [...rows.values()]) {
+        if (used.has(r.path) || listedSet.has(r.path)) continue;
+        rows.delete(r.path); report.gone++;
+        if (r.file_id) { this.add_history(r.file_id, r.path, now); touched.add(r.file_id); }
+      }
+      this.commit();
+
+      // 6. hashing
+      const todo = [...rows.values()].filter(r => mode === 'full' || r.file_id == null).sort((a, b) => cmpStr(a.path, b.path));
+      let sinceCommit = 0;
+      for (const row of todo) {
+        let h = null;
+        try { h = this.hash_unchanged(row); if (h == null) row.read_error = 'changed while hashing'; }
+        catch (e) { row.read_error = e.message; report.errors.push({ path: row.path, error: e.message }); }
+        if (h == null) continue;
+        let id = db.byHash.get(h.full);
+        if (!id) {
+          id = ++db.seq.files;
+          db.files.set(id, { id, hash: h.full, partial_hash: h.partial, size: row.size, first_seen: now, last_seen: now, format: null, meta_parser: null, meta: null });
+          db.byHash.set(h.full, id);
+        }
+        if (mode === 'full' && row.file_id && row.file_id !== id) { row.changed_from = row.file_id; report.changed++; }
+        if (row.file_id && row.file_id !== id) touched.add(row.file_id);
+        row.file_id = id; row.last_full_check = now; row.read_error = null;
+        if (row.prev_path) { this.add_history(id, row.prev_path, now); row.prev_path = null; }
+        if (row.changed_from && row.changed_from !== id) { this.same_path_edge(row.changed_from, id); touched.add(row.changed_from); }
+        row.changed_from = null;
+        touched.add(id); report.hashed++;
+        if (++sinceCommit >= HASH_COMMIT) { this.commit(); sinceCommit = 0; }
+      }
+      // 7. cleanup
+      for (const r of rows.values()) if (r.file_id) db.files.get(r.file_id).last_seen = now;
+      this.trim_history();
+      this.rebuild_keywords([...touched]);
+      this.commit();
+      return report;
+    }
+    activePaths(fid) { const out = []; for (const r of this.db.paths.values()) if (r.file_id === fid) out.push(r.path); return out.sort(cmpStr); }
+    add_history(file_id, path, at) {
+      const h = this.db.history;
+      const i = h.findIndex(x => x.file_id === file_id && x.path === path);
+      if (i >= 0) h[i].left_at = at; else h.push({ file_id, path, left_at: at });
+      const active = new Set(this.activePaths(file_id));
+      this.db.history = h.filter(x => !(x.file_id === file_id && active.has(x.path)));
+    }
+    trim_history() {
+      const by = new Map();
+      for (const x of this.db.history) { if (!by.has(x.file_id)) by.set(x.file_id, []); by.get(x.file_id).push(x); }
+      const keep = [];
+      for (const list of by.values()) keep.push(...list.sort((a, b) => b.left_at - a.left_at).slice(0, HISTORY_MAX));
+      this.db.history = keep;
+    }
+    // 4.6
+    same_path_edge(old_id, new_id) {
+      const mode = this.setting('edge.same_path');
+      if (mode === 'manual') return;
+      if (this.db.edges.some(e => e.from_id === old_id && e.to_id === new_id)) return;
+      this.db.edges.push({ from_id: old_id, to_id: new_id, origin: 'rule', status: mode === 'auto' ? 'confirmed' : 'suggested', score: null, method: 'same-path@1', bridged: 0, created_at: this.nowS() });
+    }
+
+    // ---------- 3.9 interface for import/check ----------
+    files_with_size(size) {
+      const out = [];
+      for (const r of this.db.paths.values()) {
+        if (!r.file_id) continue;
+        const f = this.db.files.get(r.file_id);
+        if (f.size === size) out.push({ rel_path: r.path, mtime_ns: r.mtime_ns ?? 0, partial_hash: f.partial_hash, full_hash: f.hash });
+      }
+      return out;
+    }
+    files_under(folder) { return [...this.db.paths.values()].filter(r => under(r.path, folder)).map(r => [r.path, r.mtime_ns]); }
+
+    // ---------- 5 tags & search ----------
+    ownTags(fid) { return this.db.tags.filter(t => t.file_id === fid); }
+    effective_tags(fid) {
+      const out = new Map();
+      const add = (t, from) => {
+        if (!out.has(t.key)) out.set(t.key, new Map());
+        const m = out.get(t.key);
+        if (!m.has(t.value_key)) m.set(t.value_key, { value: t.value, from });
+      };
+      for (const t of this.ownTags(fid)) add(t, fid);
+      const seen = new Set([fid]), queue = [fid];
+      while (queue.length) {
+        const cur = queue.shift();
+        for (const e of this.db.edges) {
+          if (e.to_id !== cur || e.status !== 'confirmed' || seen.has(e.from_id)) continue;
+          seen.add(e.from_id); queue.push(e.from_id);
+          for (const t of this.ownTags(e.from_id)) add(t, e.from_id);
+        }
+      }
+      return out;
+    }
+    tagsJson(fid) {
+      const o = {};
+      for (const [k, m] of this.effective_tags(fid)) o[k] = [...m.values()].map(v => v.from === fid ? v.value : { value: v.value, inherited_from: { file_id: v.from, path: this.activePaths(v.from)[0] ?? this.db.history.find(h => h.file_id === v.from)?.path ?? '(earlier version, no longer on disk)' } });
+      return o;
+    }
+    rebuild_keywords(ids) {
+      for (const fid of ids) {
+        const f = this.db.files.get(fid); if (!f) continue;
+        this.db.keywords.delete(fid);
+        if (f.size === 0) continue;
+        const m = new Map();
+        const put = (w, wt) => { if (!(m.get(w) >= wt)) m.set(w, wt); };
+        const addPath = (path, factor) => {
+          const parts = path.split('/'), folders = parts.slice(0, -1), file = parts[parts.length - 1];
+          folders.forEach((fo, i) => U.words(fo).forEach(w => put(w, (1 + i) * factor)));
+          U.words(U.stem(file)).forEach(w => put(w, (folders.length + 2) * factor));
+          U.words(U.ext(file)).forEach(w => put(w, 1 * factor));
+        };
+        for (const p of this.activePaths(fid)) addPath(p, 1.0);
+        for (const h of this.db.history) if (h.file_id === fid) addPath(h.path, 0.5);
+        for (const t of this.ownTags(fid)) for (const w of U.words(t.value)) put(w, 4.0);
+        if (m.size) this.db.keywords.set(fid, m);
+      }
+    }
+    search(query) {
+      const q = U.words(query); if (!q.length) return [];
+      let ids = null; const cand = {};
+      for (const w of q) {
+        cand[w] = new Map();
+        for (const [fid, m] of this.db.keywords) for (const [word, wt] of m) if (word.startsWith(w)) cand[w].set(fid, Math.max(cand[w].get(fid) || 0, wt));
+        const s = new Set(cand[w].keys());
+        ids = ids ? new Set([...ids].filter(x => s.has(x))) : s;
+      }
+      const nowNs = this.k.now();
+      const res = [...ids].map(id => {
+        let score = q.reduce((a, w) => a + cand[w].get(id), 0);
+        const bonus = [...this.db.paths.values()].some(r => r.file_id === id && r.atime_ns != null && r.last_full_check != null &&
+          r.atime_ns > (r.last_full_check + 60) * 1e9 && r.atime_ns > nowNs - 30 * 86400e9);
+        if (bonus) score += 0.5;
+        const paths = this.activePaths(id);
+        return { file_id: id, paths, tags: this.tagsJson(id), score };
+      });
+      res.sort((a, b) => b.score - a.score || (Math.min(...a.paths.map(p => p.length), 1e9) - Math.min(...b.paths.map(p => p.length), 1e9)));
+      return res;
+    }
+
+    // 5.2 selector -> {ids, pending, missing}
+    resolve(sel, cwd) {
+      const ids = new Set(), pending = [], missing = [];
+      const addRow = r => { if (r.file_id) ids.add(r.file_id); else pending.push(r.path); };
+      for (const s of sel.paths) {
+        const base = (cwd === this.root || cwd.startsWith(this.root + '/')) ? cwd : this.root;
+        const abs = normPath(s, base);
+        if (abs !== this.root && !abs.startsWith(this.root + '/')) { missing.push(s); continue; }
+        const rel = abs === this.root ? '' : abs.slice(this.root.length + 1);
+        const exact = this.db.paths.get(rel);
+        if (exact && !s.endsWith('/')) { addRow(exact); continue; }
+        const key = this.path_key(rel);
+        const inFolder = [...this.db.paths.values()].filter(r => rel === '' || r.path_key.startsWith(key + '/'));
+        if (inFolder.length) { inFolder.forEach(addRow); continue; }
+        const byKey = [...this.db.paths.values()].filter(r => r.path_key === key);
+        if (byKey.length) { byKey.forEach(addRow); continue; }
+        missing.push(s);
+      }
+      if (sel.search != null) for (const r of this.search(sel.search)) ids.add(r.file_id);
+      if (sel.view != null) {
+        const v = this.getView(sel.view);
+        const folder = (sel.folder || '').replace(/\/+$/, '');
+        for (const it of this.viewItems(v)) if (!it.error && (it.folder === folder || it.folder.startsWith(folder + '/') || folder === '')) ids.add(it.row.file_id);
+      }
+      if (missing.length) throw new AppError(`not in library: ${missing.join(', ')}`);
+      return { ids: [...ids].sort((a, b) => a - b), pending };
+    }
+    tag_add(sel, key, value, apply) {
+      const k = norm_key(key); if (!k) throw new AppError('empty tag key');
+      const vt = value.trim(); if (!vt) throw new AppError('empty tag value');
+      const existing = this.db.tags.find(t => t.key === k && t.value_key === norm_value(vt));
+      const v = existing ? existing.value : vt;
+      const { ids, pending } = sel;
+      const already = ids.filter(id => this.db.tags.some(t => t.file_id === id && t.key === k && t.value_key === norm_value(v))).length;
+      const preview = { key: k, value: v, files: ids.length, paths: ids.reduce((a, id) => a + this.activePaths(id).length, 0), already, pending_hash: pending,
+        warning: bad_folder_name(v) ? "value can't be a folder name" : null, applied: !!apply };
+      if (existing && existing.value !== vt) preview.note = `existing spelling "${existing.value}" is used`;
+      if (!apply) return preview;
+      for (const id of ids) if (!this.db.tags.some(t => t.file_id === id && t.key === k && t.value_key === norm_value(v)))
+        this.db.tags.push({ file_id: id, key: k, value: v, value_key: norm_value(v) });
+      this.rebuild_keywords(ids); this.commit();
+      return preview;
+    }
+    tag_remove(sel, key, value, apply) {
+      const k = norm_key(key), vk = norm_value(value);
+      const own = [], inheritedOnly = [];
+      for (const id of sel.ids) {
+        if (this.db.tags.some(t => t.file_id === id && t.key === k && t.value_key === vk)) own.push(id);
+        else if (this.effective_tags(id).get(k)?.has(vk)) inheritedOnly.push(id);
+      }
+      const preview = { key: k, value: value.trim(), files: own.length, inherited_only: inheritedOnly.length, pending_hash: sel.pending, applied: !!apply };
+      if (inheritedOnly.length) preview.hint = 'inherited tags can only be removed from the original (see "files" for inherited_from)';
+      if (!apply) return preview;
+      const s = new Set(own);
+      this.db.tags = this.db.tags.filter(t => !(s.has(t.file_id) && t.key === k && t.value_key === vk));
+      this.rebuild_keywords(own); this.commit();
+      return preview;
+    }
+    tag_rename_value(key, oldV, newV, apply) {
+      const k = norm_key(key), ok = norm_value(oldV), nk = norm_value(newV);
+      if (!newV.trim()) throw new AppError('empty tag value');
+      const rows = this.db.tags.filter(t => t.key === k && t.value_key === ok);
+      if (!rows.length) throw new AppError(`no file has ${k}=${oldV}`);
+      const existing = this.db.tags.find(t => t.key === k && t.value_key === nk && t.value_key !== ok);
+      const v = existing ? existing.value : newV.trim();
+      const merged = rows.filter(r => this.db.tags.some(t => t !== r && t.file_id === r.file_id && t.key === k && t.value_key === nk)).length;
+      const preview = { key: k, from: rows[0].value, to: v, files: rows.length, merged_into_existing: existing ? true : false, merged_files: merged,
+        warning: bad_folder_name(v) ? "value can't be a folder name" : null, applied: !!apply };
+      if (!apply) return preview;
+      for (const r of rows) {
+        if (this.db.tags.some(t => t !== r && t.file_id === r.file_id && t.key === k && t.value_key === nk)) r._del = true;
+        else { r.value = v; r.value_key = nk; }
+      }
+      this.db.tags = this.db.tags.filter(t => !t._del);
+      this.rebuild_keywords([...new Set(rows.map(r => r.file_id))]); this.commit();
+      return preview;
+    }
+    tag_rename_key(oldK, newK, apply) {
+      const o = norm_key(oldK), n = norm_key(newK);
+      if (!n) throw new AppError('empty tag key');
+      if (o === n) throw new AppError('keys are the same after normalisation');
+      const rows = this.db.tags.filter(t => t.key === o);
+      if (!rows.length) throw new AppError(`no tag with key ${o}`);
+      const dup = r => this.db.tags.some(t => t.file_id === r.file_id && t.key === n && t.value_key === r.value_key);
+      const preview = { from: o, to: n, tags: rows.length, files: new Set(rows.map(r => r.file_id)).size, merged_with_existing_key: this.db.tags.some(t => t.key === n), duplicates_dropped: rows.filter(dup).length, applied: !!apply };
+      if (!apply) return preview;
+      for (const r of rows) { if (dup(r)) r._del = true; else r.key = n; }
+      this.db.tags = this.db.tags.filter(t => !t._del);
+      this.commit();
+      return preview;
+    }
+    tag_values(key) {
+      const k = norm_key(key), m = new Map();
+      for (const t of this.db.tags) if (t.key === k) { if (!m.has(t.value_key)) m.set(t.value_key, { value: t.value, files: 0 }); m.get(t.value_key).files++; }
+      return [...m.values()].sort((a, b) => b.files - a.files || cmpStr(a.value, b.value));
+    }
+
+    // ---------- 6 views ----------
+    static validateTemplate(tpl) {
+      if (!tpl || !tpl.trim()) throw new AppError('template is empty');
+      const levels = tpl.split('/');
+      const keys = [];
+      levels.forEach((lvl, i) => {
+        if (lvl === '' ) throw new AppError('template has an empty level');
+        if (lvl === '..' || lvl.includes('..')) throw new AppError('template must not contain ".."');
+        if (lvl.startsWith('.')) throw new AppError(`level "${lvl}" starts with a dot`);
+        if (i === 0 && ['_inbox', '.asscat'].includes(nfcLower(lvl))) throw new AppError(`first level must not be ${lvl}`);
+        const m = /^\{([^{}]+)\}$/.exec(lvl);
+        if (m) { const k = norm_key(m[1]); if (!k) throw new AppError('empty placeholder'); keys.push(k); return; }
+        if (/[{}]/.test(lvl)) throw new AppError(`level "${lvl}" must be exactly one {key} or fixed text without braces`);
+        if (bad_folder_name(lvl)) throw new AppError(`level "${lvl}" is not a valid folder name`);
+      });
+      return levels.map(l => { const m = /^\{([^{}]+)\}$/.exec(l); return m ? '{' + norm_key(m[1]) + '}' : l; }).join('/');
+    }
+    getView(name) { const v = this.db.views.get(name); if (!v) throw new AppError(`no view named ${name}`); return v; }
+    computed(k, row) {
+      if (!COMPUTED.includes(k)) return null;
+      const name = basename('/' + row.path);
+      if (k === 'pripona') return [U.ext(name) ? U.ext(name).toLowerCase() : 'bez pripony'];
+      if (k === 'druh') return [druh(U.ext(name))];
+      if (row.mtime_ns == null) return [];
+      const p = U.localParts(row.mtime_ns, this.k.tzMin);
+      if (k === 'rok') return [String(p.y)];
+      if (k === 'mesic') return [U.pad(p.mo)];
+      return [`${p.y}-${U.pad(p.mo)}-${U.pad(p.d)}`];
+    }
+    passFilter(view, eff, row) {
+      for (const c of JSON.parse(view.filter)) {
+        const comp = this.computed(c.key, row);
+        if (comp) { if (!comp.some(v => norm_value(v) === norm_value(c.value))) return false; }
+        else if (!eff.get(c.key)?.has(norm_value(c.value))) return false;
+      }
+      return true;
+    }
+    // 6.3 -> {folder, reasons} | {error}
+    target_folder(view, row, eff) {
+      const none = JSON.parse(view.none_names); const levels = []; const reasons = [];
+      for (const lvl of view.template.split('/')) {
+        const m = /^\{(.+)\}$/.exec(lvl);
+        if (!m) { levels.push(lvl); continue; }
+        const k = m[1];
+        let vals = this.computed(k, row) ?? [...(eff.get(k)?.values() || [])].map(x => x.value);
+        const seen = new Set(); vals = vals.filter(v => { const kk = norm_value(v); if (seen.has(kk)) return false; seen.add(kk); return true; });
+        vals.sort((a, b) => cmpStr(U.lower(a), U.lower(b)) || cmpStr(a, b));
+        if (vals.length > 1) reasons.push(`${vals.length} values: ${k}`);
+        const name = vals.length ? vals.join(' + ') : (none[k] ?? `bez ${k}`);
+        if (bad_folder_name(name)) return { error: `invalid folder name "${name}"`, reasons };
+        levels.push(name);
+      }
+      return { folder: levels.join('/'), reasons };
+    }
+    viewItems(view) {
+      const out = [];
+      for (const row of [...this.db.paths.values()].sort((a, b) => cmpStr(a.path, b.path))) {
+        if (!row.file_id) continue;
+        const eff = this.effective_tags(row.file_id);
+        if (!this.passFilter(view, eff, row)) continue;
+        const t = this.target_folder(view, row, eff);
+        out.push({ row, eff, folder: t.folder, error: t.error, reasons: t.reasons });
+      }
+      return out;
+    }
+    lockedFolders() { return this.setting('materialize.locked').map(p => p.replace(/^\/+|\/+$/g, '')).filter(Boolean); }
+    isLocked(path) { const k = this.path_key(path); return this.lockedFolders().some(l => { const lk = this.path_key(l); return k === lk || k.startsWith(lk + '/'); }); }
+
+    // ---------- 7 materialize ----------
+    preview(view, opts = {}) {
+      const tkey = p => nfcLower(p);
+      const rows = []; const res = new Map();               // row.path -> result object
+      const set = (row, o) => { const r = { path: row.path, target: o.target ?? null, result: o.result }; if (o.reason) r.reason = o.reason; res.set(row.path, r); rows.push(r); return r; };
+      const cands = [];
+      for (const row of [...this.db.paths.values()].sort((a, b) => cmpStr(a.path, b.path))) {
+        if (!row.file_id) {
+          if (this.passFilter(view, new Map(), row)) set(row, { result: 'stay:pending', reason: 'waiting for full hash' });
+          continue;
+        }
+        const eff = this.effective_tags(row.file_id);
+        if (!this.passFilter(view, eff, row)) continue;
+        if (this.isLocked(row.path)) { set(row, { result: 'stay:locked', reason: 'under a locked folder' }); continue; }
+        const t = this.target_folder(view, row, eff);
+        if (t.error) { set(row, { result: 'stay:invalid', reason: t.error }); continue; }
+        const target = t.folder + '/' + basename('/' + row.path);
+        if (target.length > MAX_PATH_CHARS) { set(row, { result: 'stay:invalid', target, reason: 'path too long' }); continue; }
+        const o = set(row, { result: target === row.path ? 'stay:in_place' : 'move', target, reason: t.reasons.join('; ') || undefined });
+        cands.push({ row, o, key: tkey(target) });
+      }
+      // 7.2 duplicates
+      const byFile = new Map();
+      for (const c of cands) { const g = `${c.row.file_id}\u0000${c.key}`; if (!byFile.has(g)) byFile.set(g, []); byFile.get(g).push(c); }
+      for (const g of byFile.values()) if (g.length > 1) {
+        g.sort((a, b) => (a.o.result === 'stay:in_place' ? -1 : 0) - (b.o.result === 'stay:in_place' ? -1 : 0) || a.row.first_seen - b.row.first_seen || cmpStr(a.row.path, b.row.path));
+        for (const c of g.slice(1)) { c.o.result = 'stay:duplicate'; c.o.reason = `same content moves from ${g[0].row.path}`; }
+      }
+      // 7.3 conflicts
+      const live = cands.filter(c => c.o.result === 'move' || c.o.result === 'stay:in_place');
+      const movers = new Set(live.filter(c => c.o.result === 'move').map(c => tkey(c.row.path)));
+      const pathKeys = new Map(); for (const r of this.db.paths.values()) pathKeys.set(tkey(r.path), r.path);
+      const occupiedByStayer = (key, target, selfPath) => {
+        if (key === tkey(selfPath)) return false;           // only spelling changes
+        if (pathKeys.has(key)) return !movers.has(key);
+        return this.k.exists(this.abs(target));             // unindexed file or a folder on disk
+      };
+      const byTarget = new Map();
+      for (const c of live) { if (!byTarget.has(c.key)) byTarget.set(c.key, []); byTarget.get(c.key).push(c); }
+      const claimed = new Set();
+      const toRename = [];
+      for (const [key, g] of byTarget) {
+        const files = new Set(g.map(c => c.row.file_id));
+        const stayer = g.find(c => c.o.result === 'stay:in_place');
+        if (files.size === 1) {
+          const c = g[0];
+          if (c.o.result === 'move' && occupiedByStayer(key, c.o.target, c.row.path)) { c.o.result = 'stay:conflict'; c.o.reason = 'target is occupied on disk'; }
+          else claimed.add(key);
+          continue;
+        }
+        let winner = stayer;
+        if (!winner && opts.renameConflicts) {
+          winner = [...g].sort((a, b) => (a.row.mtime_ns ?? 0) - (b.row.mtime_ns ?? 0) || cmpStr(a.row.path, b.row.path))[0];
+          if (occupiedByStayer(key, winner.o.target, winner.row.path)) { winner.o.result = 'stay:conflict'; winner.o.reason = 'target is occupied on disk'; }
+        }
+        if (winner && winner.o.result !== 'stay:conflict') claimed.add(key);
+        for (const c of g) {
+          if (c === winner) continue;
+          if (c.o.result === 'stay:in_place') continue;
+          if (opts.renameConflicts) toRename.push(c);
+          else { c.o.result = 'stay:conflict'; c.o.reason = `${files.size} different files want ${c.o.target}`; }
+        }
+      }
+      for (const c of toRename) {
+        const folder = dirname('/' + c.o.target).slice(1), name = basename('/' + c.o.target);
+        const st = U.stem(name), ex = U.ext(name);
+        for (let n = 1; ; n++) {
+          const nn = `${st} (${n})${ex ? '.' + ex : ''}`, t = folder + '/' + nn, key = tkey(t);
+          if (claimed.has(key) || occupiedByStayer(key, t, c.row.path) || pathKeys.has(key)) continue;
+          if (U.utf8Len(nn) > MAX_LEVEL_BYTES || t.length > MAX_PATH_CHARS) { c.o.result = 'stay:invalid'; c.o.reason = 'renamed name exceeds limits'; break; }
+          c.o.result = 'rename'; c.o.target = t; c.o.reason = `name conflict, renamed`; claimed.add(key); break;
+        }
+      }
+      const summary = {};
+      for (const r of rows) summary[r.result] = (summary[r.result] || 0) + 1;
+      const warnings = [];
+      const proj = [...this.db.paths.values()].filter(r => PROJECT_EXT.includes(U.ext(basename('/' + r.path)).toLowerCase()) && !this.isLocked(r.path));
+      if (proj.length) warnings.push({ warning: 'project files present', hint: 'project files reference media by path; lock their folders with materialize.locked', paths: proj.map(r => r.path) });
+      return { view: view.name, template: view.template, summary, warnings, rows };
+    }
+    // order steps so a target is free before it is used (A->B after B->C)
+    orderSteps(steps) {
+      const tkey = p => nfcLower(p);
+      const occ = new Set([...this.db.paths.keys()].map(tkey));
+      const out = []; let rest = steps.slice();
+      while (rest.length) {
+        const ready = rest.filter(s => !occ.has(tkey(s.to)) || tkey(s.to) === tkey(s.from));
+        if (!ready.length) { out.push(...rest); break; }
+        for (const s of ready) { occ.delete(tkey(s.from)); occ.add(tkey(s.to)); out.push(s); }
+        rest = rest.filter(s => !ready.includes(s));
+      }
+      return out;
+    }
+    applySteps(kind, viewName, steps, opts = {}) {
+      const db = this.db, k = this.k, now = this.nowS();
+      const op = { id: ++db.seq.ops, kind, view: viewName, state: 'running', created_at: now, finished_at: null };
+      db.ops.push(op);
+      const ordered = this.orderSteps(steps);
+      const recs = ordered.map((s, i) => ({ op_id: op.id, seq: i + 1, from_path: s.from, to_path: s.to, file_id: s.file_id, state: 'planned', error: null }));
+      for (let i = 0; i < recs.length; i += JOURNAL_BATCH) { db.op_steps.push(...recs.slice(i, i + JOURNAL_BATCH)); this.commit(); }
+      if (!recs.length) this.commit();
+      let renamed = 0;
+      for (let i = 0; i < recs.length; i += JOURNAL_BATCH) {
+        const batch = recs.slice(i, i + JOURNAL_BATCH);
+        for (const s of batch) {
+          try {
+            k.mkdir(dirname(this.abs(s.to_path)), { p: true });
+            k.rename(this.abs(s.from_path), this.abs(s.to_path), { noReplace: true });   // rename_new: never overwrites
+            s.state = 'done'; renamed++;
+            if (opts.crashAfter != null && renamed >= opts.crashAfter) throw new Crash(`simulated crash after ${renamed} rename(s)`);
+          } catch (e) { if (e.crash) throw e; s.state = 'failed'; s.error = e.message; }
+        }
+        for (const s of batch) if (s.state === 'done') this.applyPathMove(s.from_path, s.to_path, s.file_id, now);
+        this.commit();
+        this.err(`${kind}: ${Math.min(i + JOURNAL_BATCH, recs.length)}/${recs.length} steps`);
+      }
+      const skip = new Set(['', '.asscat', '_inbox']);
+      for (const s of recs) if (s.state === 'done') {
+        let d = dirname('/' + s.from_path).slice(1);
+        while (d && !skip.has(d) && !this.isLocked(d)) {
+          const abs = this.abs(d);
+          if (!k.exists(abs) || k.readdir(abs).length) break;
+          k.rmdir(abs); d = dirname('/' + d).slice(1);
+        }
+      }
+      op.state = 'done'; op.finished_at = this.nowS(); this.commit();
+      const res = { op_id: op.id, kind, done: recs.filter(s => s.state === 'done').length, failed: recs.filter(s => s.state === 'failed').map(s => ({ from: s.from_path, to: s.to_path, error: s.error })) };
+      res.sync = this.sync('fast');
+      return res;
+    }
+    applyPathMove(from, to, fid, now) {
+      const r = this.db.paths.get(from);
+      if (!r) return;
+      this.db.paths.delete(from);
+      r.path = to; r.path_key = this.path_key(to);
+      this.db.paths.set(to, r);
+      this.add_history(fid, from, now);
+      this.rebuild_keywords([fid]);
+    }
+    materialize(view, opts) {
+      const plan = this.preview(view, opts);
+      if (!opts.apply) return plan;
+      const p = U.localParts(this.k.now(), this.k.tzMin);
+      this.backup(`library-${p.y}-${U.pad(p.mo)}-${U.pad(p.d)}-${U.pad(p.h)}${U.pad(p.mi)}${U.pad(p.s)}.db`);
+      const steps = plan.rows.filter(r => r.result === 'move' || r.result === 'rename').map(r => ({ from: r.path, to: r.target, file_id: this.db.paths.get(r.path).file_id }));
+      const out = this.applySteps('materialize', view.name, steps, opts);
+      return { view: view.name, summary: plan.summary, warnings: plan.warnings, ...out };
+    }
+    // 7.5
+    undo_last(apply) {
+      const last = [...this.db.ops].reverse().find(o => o.kind === 'materialize');
+      if (!last || last.state !== 'done') return { result: 'nothing to undo' };
+      const plan = [], stays = [];
+      const steps = this.db.op_steps.filter(s => s.op_id === last.id && s.state === 'done').sort((a, b) => b.seq - a.seq);
+      for (const s of steps) {
+        const now_row = this.db.paths.get(s.to_path);
+        if (now_row && now_row.file_id === s.file_id && !this.k.exists(this.abs(s.from_path))) plan.push({ from: s.to_path, to: s.from_path, file_id: s.file_id });
+        else stays.push({ path: s.to_path, original: s.from_path, result: 'moved or changed since, stays' });
+      }
+      const out = { undo_op: last.id, view: last.view, back: plan.length, stays };
+      if (!apply) return { ...out, plan: plan.map(p => ({ from: p.from, to: p.to })) };
+      const res = this.applySteps('undo', last.view, plan);
+      last.state = 'undone'; this.commit();
+      return { ...out, ...res };
+    }
+    // 7.6
+    recover_ops() {
+      for (const op of this.db.ops.filter(o => o.state === 'running')) {
+        const c = { done: 0, skipped: 0, failed: 0 }; const now = this.nowS();
+        for (const s of this.db.op_steps.filter(x => x.op_id === op.id && x.state === 'planned')) {
+          const f = this.k.exists(this.abs(s.from_path)), t = this.k.exists(this.abs(s.to_path));
+          if (!f && t) { s.state = 'done'; this.applyPathMove(s.from_path, s.to_path, s.file_id, now); c.done++; }
+          else if (f && !t) { s.state = 'skipped'; c.skipped++; }
+          else { s.state = 'failed'; s.error = 'both or neither exist'; c.failed++; }
+        }
+        op.state = 'done'; op.finished_at = now;
+        this.commit();
+        this.err(`recovered interrupted ${op.kind} #${op.id}: ${c.done} done, ${c.skipped} skipped (not started), ${c.failed} failed; run it again to finish`);
+        this.recovered = (this.recovered || []).concat([{ op: op.id, ...c }]);
+      }
+    }
+  }
+
+  // ---------------------------------------------------------------- argument parsing
+  function parseArgs(argv, spec = {}) {
+    const flags = new Set(spec.flags || []), opts = new Set(spec.opts || []), multi = new Set(spec.multi || []);
+    const out = { _: [] };
+    for (let i = 0; i < argv.length; i++) {
+      const a = argv[i];
+      if (a.startsWith('--') && a.length > 2) {
+        let [name, val] = a.slice(2).split(/=(.*)/s);
+        if (flags.has(name)) { out[name] = true; continue; }
+        if (opts.has(name) || multi.has(name)) {
+          if (val === undefined) { val = argv[++i]; if (val === undefined) throw new UsageError(`--${name} needs a value`); }
+          if (multi.has(name)) (out[name] = out[name] || []).push(val); else out[name] = val;
+          continue;
+        }
+        throw new UsageError(`unknown option --${name}`);
+      }
+      out._.push(a);
+    }
+    return out;
+  }
+  const kv = (s, what) => { const i = s.indexOf('='); if (i <= 0) throw new UsageError(`${what} must be key=value: ${s}`); return [s.slice(0, i), s.slice(i + 1)]; };
+
+  // ---------------------------------------------------------------- CLI
+  const HELP = `asscat-cli [--config <file>] <command>     (changes need --apply / --yes, otherwise preview)
+  library                                   show configured library
+  library open <folder> [--start-over]      choose + open library
+  library forget <folder>
+  sync [fast|full]                          scan the library
+  volumes | check <volume> | import <volume>
+  filter | filter set <json>                import filter (import_filter.json)
+  shoots [resolution] [min_files]           propose shoots for _inbox (prints JSON)
+  shoots apply <proposal.json> [--yes]
+  files <selector…>
+  tag add|remove <key> <value> <selector…> [--yes]
+  tag rename-value <key> <old> <new> [--yes] | tag rename-key <old> <new> [--yes]
+  tag values <key>
+  search <query…>
+  edge add|confirm|reject <original> <edit> | edge list <path>
+  setting get <key> | setting set <key> <json>
+  view set <name> <template> [--filter k=v]… [--none k=name]…
+  view list | view activate <name> | view delete <name> | view show <name> [<virtual folder>]
+  materialize <view> [--rename-conflicts] [--apply]
+  materialize undo [--apply]
+  db [table]                                (demo only) dump a database table
+selector: paths (relative to the library root or the current folder; "dir/" = everything below),
+          --search "<query>", --view <name> --folder "<virtual folder>"`;
+
+  class App {
+    constructor(k, { cwd = '/', out = () => {}, err = () => {}, configPath, host } = {}) {
+      this.k = k; this.cwd = cwd; this.out = out; this.err = err;
+      this.configPath = configPath || '/Users/prokop/.config/asscat/config.json';
+      this.host = host;
+    }
+    readConfig() {
+      try { return JSON.parse(this.k.readFile(this.configPath)); } catch { return { library: null, libraries: [] }; }
+    }
+    writeConfig(c) { this.k.mkdir(dirname(this.configPath), { p: true }); this.k.writeFile(this.configPath, JSON.stringify(c, null, 2)); }
+    filterPath() { return join(dirname(this.configPath), 'import_filter.json'); }
+    readFilter() { try { return JSON.parse(this.k.readFile(this.filterPath())); } catch { return DEFAULT_FILTER; } }
+    openConfigured(opts = {}) {
+      const c = this.readConfig();
+      if (!c.library) throw new AppError('no library configured; run "library open <folder>"');
+      return new Library(this, c.library).open(opts);
+    }
+    // returns exit code; JSON result on stdout
+    run(argv, opts = {}) {
+      this.pid = this.k.spawn('asscat-cli', { host: this.host });
+      this.debug = opts;
+      try {
+        const g = [];
+        for (let i = 0; i < argv.length; i++) {
+          if (argv[i] === '--config') { this.configPath = normPath(argv[++i] || '', this.cwd); continue; }
+          if (argv[i] === '--crash-after') { this.crashAfter = Number(argv[++i]); continue; }
+          g.push(argv[i]);
+        }
+        const res = this.dispatch(g);
+        if (res !== undefined) this.out(typeof res === 'string' ? res : JSON.stringify(res, null, 2));
+        return 0;
+      } catch (e) {
+        if (e.crash) { this.err(`asscat-cli: process killed (${e.message})`); return 137; }
+        if (e instanceof AppError) { this.out(JSON.stringify({ error: e.message })); return e.exit; }
+        if (e instanceof OS.OSError) { this.out(JSON.stringify({ error: e.message })); return 1; }
+        this.out(JSON.stringify({ error: 'internal: ' + e.message })); this.err(e.stack || ''); return 1;
+      } finally {
+        this.k.exit(this.pid);
+      }
+    }
+    dispatch(a) {
+      const [cmd, ...rest] = a;
+      switch (cmd) {
+        case undefined: case 'help': case '--help': return HELP;
+        case 'library': return this.cmdLibrary(rest);
+        case 'sync': { const lib = this.openConfigured(); const m = rest[0] || 'fast'; if (!['fast', 'full'].includes(m)) throw new UsageError('sync [fast|full]'); return m === 'fast' ? lib.lastSync : { fast_on_open: lib.lastSync, full: lib.sync('full') }; }
+        case 'volumes': return this.k.disks().filter(d => d.removable && d.mountedAt).map(d => ({ name: d.name, path: d.mountedAt, fs: d.fs, has_dcim: this.k.exists(join(d.mountedAt, 'DCIM')) }));
+        case 'check': return this.cmdCheck(rest, false);
+        case 'import': return this.cmdCheck(rest, true);
+        case 'filter': {
+          if (rest[0] === 'set') { let f; try { f = JSON.parse(rest.slice(1).join(' ')); } catch { throw new UsageError('filter set <json>, e.g. {"include_ext":["jpg","cr3"]}'); } this.k.writeFile(this.filterPath(), JSON.stringify(f, null, 2)); return f; }
+          return this.readFilter();
+        }
+        case 'shoots': return this.cmdShoots(rest);
+        case 'files': { const lib = this.openConfigured(); const p = parseArgs(rest, { opts: ['search', 'view', 'folder'] }); return this.cmdFiles(lib, p); }
+        case 'tag': return this.cmdTag(rest);
+        case 'search': { const lib = this.openConfigured(); if (!rest.length) throw new UsageError('search <query…>'); return lib.search(rest.join(' ')); }
+        case 'edge': return this.cmdEdge(rest);
+        case 'setting': return this.cmdSetting(rest);
+        case 'view': return this.cmdView(rest);
+        case 'materialize': return this.cmdMaterialize(rest);
+        case 'db': { const lib = this.openConfigured(); if (!rest[0]) return Object.fromEntries(['files', 'paths', 'path_history', 'tags', 'edges', 'keywords', 'settings', 'views', 'ops', 'op_steps'].map(t => [t, lib.db.table(t).length])); return rest[0] === 'library' ? lib.db.library : lib.db.table(rest[0]); }
+        default: throw new UsageError(`unknown command ${cmd}; try "asscat-cli help"`);
+      }
+    }
+    cmdLibrary(rest) {
+      const c = this.readConfig();
+      if (rest[0] === 'open') {
+        const p = parseArgs(rest.slice(1), { flags: ['start-over'] });
+        if (!p._[0]) throw new UsageError('library open <folder> [--start-over]');
+        const root = normPath(p._[0], this.cwd);
+        const known = (c.libraries || []).includes(root) || c.library === root;
+        const lib = new Library(this, root).open({ startOver: !!p['start-over'], unknownFolder: !known });
+        c.library = root; c.libraries = [...new Set([...(c.libraries || []), root])];
+        this.writeConfig(c);
+        return { library: root, created: lib.created, name: lib.db.library.name, uuid: lib.db.library.uuid, sync: lib.lastSync };
+      }
+      if (rest[0] === 'forget') {
+        const root = normPath(rest[1] || '', this.cwd);
+        c.libraries = (c.libraries || []).filter(x => x !== root); if (c.library === root) c.library = null;
+        this.writeConfig(c); return { forgotten: root };
+      }
+      if (rest.length) throw new UsageError('library | library open <folder> | library forget <folder>');
+      if (!c.library) return { library: null, hint: 'run "library open <folder>"' };
+      const lib = this.openConfigured();
+      const L = lib.db.library;
+      return { library: lib.root, name: L.name, uuid: L.uuid, fs: { type: L.fs_type, case_sensitive: !!L.fs_case_sensitive, mtime_step_ns: L.fs_mtime_step_ns, mtime_local: !!L.fs_mtime_local },
+        files: lib.db.files.size, active_paths: lib.db.paths.size, tags: lib.db.tags.length, edges: lib.db.edges.length, views: [...lib.db.views.keys()],
+        active_view: [...lib.db.views.values()].find(v => v.active)?.name ?? null, recovered: lib.recovered };
+    }
+    volumePath(arg) {
+      if (!arg) throw new UsageError('give a volume name or path (see "volumes")');
+      const d = this.k.disks().find(x => x.name === arg && x.mountedAt);
+      return d ? d.mountedAt : normPath(arg, this.cwd);
+    }
+    // existing card check/import (spec ch. 2: unchanged behaviour)
+    cmdCheck(rest, doImport) {
+      const lib = this.openConfigured();
+      const src = this.volumePath(rest[0]);
+      if (!this.k.exists(src)) throw new AppError(`volume not found: ${src}`);
+      if (src === lib.root || src.startsWith(lib.root + '/') || lib.root.startsWith(src + '/')) throw new AppError('source is inside the library (or contains it)');
+      const filt = this.readFilter(); const inc = new Set((filt.include_ext || []).map(x => x.toLowerCase()));
+      const files = [];
+      const walk = rel => {
+        for (const name of this.k.readdir(join(src, rel))) {
+          const p = rel ? rel + '/' + name : name;
+          if (name.startsWith('.')) continue;
+          const st = this.k.stat(join(src, p));
+          if (st.type === 'dir') walk(p); else if (st.type === 'file') files.push({ path: p, name, size: st.size, mtime_ns: st.mtime_ns });
+        }
+      };
+      walk('');
+      const report = { source: src, total: files.length, new: [], in_library: [], filtered_out: [] };
+      for (const f of files) {
+        if (inc.size && !inc.has(U.ext(f.name).toLowerCase())) { report.filtered_out.push(f.path); continue; }
+        const cands = lib.files_with_size(f.size);
+        let hit = null;
+        if (cands.length) {
+          const ph = Library.hashPartialAbs(this.k, join(src, f.path));
+          const pc = cands.filter(c => c.partial_hash === ph);
+          if (pc.length) { const fh = Library.hashFullAbs(this.k, join(src, f.path)); hit = pc.find(c => c.full_hash === fh); }
+        }
+        if (hit) report.in_library.push({ path: f.path, library_path: hit.rel_path }); else report.new.push(f.path);
+      }
+      if (!doImport) return { ...report, new_count: report.new.length };
+      const p = U.localParts(this.k.now(), this.k.tzMin);
+      const destRel = `_inbox/${basename(src)} ${p.y}-${U.pad(p.mo)}-${U.pad(p.d)}`;
+      this.k.mkdir(lib.abs(destRel), { p: true });
+      const copied = [], failed = [];
+      for (const rel of report.new) {
+        const s = join(src, rel), name = basename('/' + rel);
+        let target = join(lib.abs(destRel), name);
+        for (let n = 1; this.k.exists(target); n++) target = join(lib.abs(destRel), `${U.stem(name)} (${n})${U.ext(name) ? '.' + U.ext(name) : ''}`);
+        const part = join(dirname(target), '.' + basename(target) + '.asscat-part');
+        try {
+          const st = this.k.stat(s);
+          const data = this.k.readFile(s);
+          this.k.writeFile(part, data, { mtime: st.mtime_ns, btime: st.btime_ns });
+          if (U.sha256(this.k.readFile(part)) !== U.sha256(data)) throw new Error('verification failed');
+          this.k.rename(part, target, { noReplace: true });
+          this.k.utimes(target, st.mtime_ns);
+          copied.push(target.slice(lib.root.length + 1));
+          this.err(`import: ${copied.length}/${report.new.length}`);
+        } catch (e) { failed.push({ path: rel, error: e.message }); if (this.k.exists(part)) this.k.unlink(part); }
+      }
+      const sync = lib.sync('fast');
+      const out = { source: src, imported: copied.length, already_in_library: report.in_library.length, filtered_out: report.filtered_out.length, into: destRel, failed, sync };
+      if (lib.setting('import.after') === 'auto') {
+        const v = [...lib.db.views.values()].find(x => x.active);
+        out.after = v ? lib.materialize(v, { apply: true }) : { skipped: 'import.after=auto but no active view' };
+      }
+      return out;
+    }
+    cmdShoots(rest) {
+      if (rest[0] === 'apply') {
+        const p = parseArgs(rest.slice(1), { flags: ['yes'] });
+        if (!p._[0]) throw new UsageError('shoots apply <proposal.json> [--yes]');
+        const lib = this.openConfigured();
+        let prop; try { prop = JSON.parse(this.k.readFile(normPath(p._[0], this.cwd))); } catch (e) { throw new AppError(`cannot read proposal: ${e.message}`); }
+        const results = [];
+        for (const s of prop.shoots || []) {
+          if (!s.name) { results.push({ id: s.id, skipped: 'no name' }); continue; }
+          const sel = lib.resolve({ paths: s.files }, lib.root);
+          const r = { id: s.id, shoot: lib.tag_add(sel, 'shoot', s.name, p.yes) };
+          if (s.klient) r.klient = lib.tag_add(sel, 'klient', s.klient, p.yes);
+          results.push(r);
+        }
+        return { applied: !!p.yes, shoots: results };
+      }
+      const lib = this.openConfigured();
+      const res = U.parseDuration(rest[0] || '2h'); const minFiles = Number(rest[1] || 3);
+      if (res == null || !(minFiles >= 1)) throw new UsageError('shoots [resolution e.g. 2h] [min_files]');
+      const files = [...lib.db.paths.values()].filter(r => r.file_id && r.path.startsWith('_inbox/')).sort((a, b) => (a.mtime_ns ?? 0) - (b.mtime_ns ?? 0) || cmpStr(a.path, b.path));
+      const groups = []; let cur = [];
+      for (const f of files) { if (cur.length && (f.mtime_ns ?? 0) - (cur[cur.length - 1].mtime_ns ?? 0) > res) { groups.push(cur); cur = []; } cur.push(f); }
+      if (cur.length) groups.push(cur);
+      const shoots = [], no_shoot = [];
+      for (const g of groups) {
+        if (g.length < minFiles) { no_shoot.push(...g.map(f => f.path)); continue; }
+        shoots.push({ id: shoots.length + 1, from: U.fmtLocal(g[0].mtime_ns, this.k.tzMin, false), to: U.fmtLocal(g[g.length - 1].mtime_ns, this.k.tzMin, false), files: g.map(f => f.path), name: null, klient: null });
+      }
+      return { shoots, no_shoot, hint: 'save with "> proposal.json", fill name/klient, then "shoots apply proposal.json --yes"' };
+    }
+    cmdFiles(lib, p) {
+      const sel = lib.resolve({ paths: p._, search: p.search, view: p.view, folder: p.folder }, this.cwd);
+      const out = sel.ids.map(id => {
+        const f = lib.db.files.get(id);
+        const rows = [...lib.db.paths.values()].filter(r => r.file_id === id);
+        return { file_id: id, hash: f.hash.slice(0, 16) + '…', size: f.size, paths: rows.map(r => ({ path: r.path, mtime: U.fmtLocal(r.mtime_ns, this.k.tzMin), hash_status: r.last_full_check ? 'verified' : 'assigned (not re-verified since move)' })),
+          history: lib.db.history.filter(h => h.file_id === id).sort((a, b) => b.left_at - a.left_at).map(h => h.path),
+          tags: lib.tagsJson(id),
+          edges: { originals: lib.db.edges.filter(e => e.to_id === id).map(e => ({ file_id: e.from_id, paths: lib.activePaths(e.from_id), origin: e.origin, status: e.status })),
+                   edits: lib.db.edges.filter(e => e.from_id === id).map(e => ({ file_id: e.to_id, paths: lib.activePaths(e.to_id), origin: e.origin, status: e.status })) } };
+      });
+      const pending = sel.pending.map(path => { const r = lib.db.paths.get(path); return { path, file_id: null, hash_status: r.read_error ? 'error: ' + r.read_error : 'waiting for full hash' }; });
+      return [...out, ...pending];
+    }
+    selFrom(lib, p, n) {
+      const sel = { paths: p._.slice(n), search: p.search, view: p.view, folder: p.folder };
+      if (!sel.paths.length && sel.search == null && sel.view == null) throw new UsageError('missing selector (paths, --search or --view/--folder)');
+      return lib.resolve(sel, this.cwd);
+    }
+    cmdTag(rest) {
+      const [sub, ...r] = rest;
+      const p = parseArgs(r, { flags: ['yes'], opts: ['search', 'view', 'folder'] });
+      const lib = this.openConfigured();
+      const need = (n, u) => { if (p._.length < n) throw new UsageError(u); };
+      switch (sub) {
+        case 'add': need(2, 'tag add <key> <value> <selector…>'); return lib.tag_add(this.selFrom(lib, p, 2), p._[0], p._[1], p.yes);
+        case 'remove': need(2, 'tag remove <key> <value> <selector…>'); return lib.tag_remove(this.selFrom(lib, p, 2), p._[0], p._[1], p.yes);
+        case 'rename-value': need(3, 'tag rename-value <key> <old> <new>'); return lib.tag_rename_value(p._[0], p._[1], p._[2], p.yes);
+        case 'rename-key': need(2, 'tag rename-key <old> <new>'); return lib.tag_rename_key(p._[0], p._[1], p.yes);
+        case 'values': need(1, 'tag values <key>'); return lib.tag_values(p._[0]);
+        default: throw new UsageError('tag add|remove|rename-value|rename-key|values');
+      }
+    }
+    oneFile(lib, path) {
+      const sel = lib.resolve({ paths: [path] }, this.cwd);
+      if (sel.pending.length && !sel.ids.length) throw new AppError(`${path}: waiting for full hash`);
+      if (sel.ids.length !== 1) throw new AppError(`${path}: expected exactly one file, got ${sel.ids.length}`);
+      return sel.ids[0];
+    }
+    cmdEdge(rest) {
+      const [sub, a, b] = rest;
+      const lib = this.openConfigured();
+      if (sub === 'list') {
+        if (!a) throw new UsageError('edge list <path>');
+        const id = this.oneFile(lib, a);
+        const desc = e => ({ original: e.from_id, edit: e.to_id, origin: e.origin, status: e.status, method: e.method });
+        const walk = (start, dir) => { const seen = new Set([start]), q = [start], out = []; while (q.length) { const c = q.shift(); for (const e of lib.db.edges) { const nx = dir === 'up' ? (e.to_id === c ? e.from_id : null) : (e.from_id === c ? e.to_id : null); if (nx == null || seen.has(nx)) continue; seen.add(nx); q.push(nx); out.push({ file_id: nx, paths: lib.activePaths(nx), via: desc(e) }); } } return out; };
+        return { file_id: id, paths: lib.activePaths(id), ancestors: walk(id, 'up'), descendants: walk(id, 'down') };
+      }
+      if (!['add', 'confirm', 'reject'].includes(sub) || !a || !b) throw new UsageError('edge add|confirm|reject <original> <edit> | edge list <path>');
+      const from = this.oneFile(lib, a), to = this.oneFile(lib, b);
+      if (from === to) throw new AppError('original and edit are the same content');
+      let e = lib.db.edges.find(x => x.from_id === from && x.to_id === to);
+      if (sub === 'add') {
+        if (e) { e.origin = 'user'; e.status = 'confirmed'; e.method = null; }
+        else { e = { from_id: from, to_id: to, origin: 'user', status: 'confirmed', score: null, method: null, bridged: 0, created_at: lib.nowS() }; lib.db.edges.push(e); }
+      } else {
+        if (!e) throw new AppError('no such edge; use "edge add"');
+        e.status = sub === 'confirm' ? 'confirmed' : 'rejected';
+      }
+      lib.commit();
+      return e;
+    }
+    cmdSetting(rest) {
+      const [sub, key, ...v] = rest;
+      if (!(key in DEFAULT_SETTINGS)) throw new UsageError(`setting get|set <key>; keys: ${Object.keys(DEFAULT_SETTINGS).join(', ')}`);
+      const lib = this.openConfigured();
+      if (sub === 'get') return { key, value: lib.setting(key), default: key in lib.db.settings ? false : true };
+      if (sub === 'set') {
+        let val; try { val = JSON.parse(v.join(' ')); } catch { throw new UsageError(`value must be JSON, e.g. setting set edge.same_path '"ask"'`); }
+        if (!SETTING_CHECK[key](val)) throw new AppError(`invalid value for ${key}`);
+        lib.db.settings[key] = JSON.stringify(val); lib.commit();
+        return { key, value: val };
+      }
+      throw new UsageError('setting get|set');
+    }
+    cmdView(rest) {
+      const [sub, ...r] = rest;
+      const lib = this.openConfigured();
+      switch (sub) {
+        case 'set': {
+          const p = parseArgs(r, { multi: ['filter', 'none'] });
+          const [name, tpl] = p._;
+          if (!name || !tpl) throw new UsageError('view set <name> <template> [--filter k=v]… [--none k=name]…');
+          const template = Library.validateTemplate(tpl);
+          const filter = (p.filter || []).map(s => { const [k, v] = kv(s, '--filter'); if (!norm_key(k) || !v.trim()) throw new AppError('empty filter key/value'); return { key: norm_key(k), value: v.trim() }; });
+          const none = {};
+          for (const s of p.none || []) { const [k, v] = kv(s, '--none'); if (bad_folder_name(v.trim())) throw new AppError(`"${v}" is not a valid folder name`); none[norm_key(k)] = v.trim(); }
+          const old = lib.db.views.get(name);
+          lib.db.views.set(name, { name, template, filter: JSON.stringify(filter), none_names: JSON.stringify(none), active: old ? old.active : 0 });
+          lib.commit(); return this.viewJson(lib.db.views.get(name));
+        }
+        case 'list': return [...lib.db.views.values()].map(v => this.viewJson(v));
+        case 'activate': { const v = lib.getView(r[0]); for (const x of lib.db.views.values()) x.active = 0; v.active = 1; lib.commit(); return this.viewJson(v); }
+        case 'delete': { lib.getView(r[0]); lib.db.views.delete(r[0]); lib.commit(); return { deleted: r[0] }; }
+        case 'show': {
+          const v = lib.getView(r[0]);
+          const plan = lib.preview(v, {});
+          const byPath = new Map(plan.rows.map(x => [x.path, x]));
+          const items = lib.viewItems(v);
+          const shownFile = new Set(); const tree = new Map(); const invalid = [];
+          // a file with several paths appears once: at the path that would move (7.2)
+          const order = items.slice().sort((a, b) => (byPath.get(a.row.path)?.result === 'stay:duplicate') - (byPath.get(b.row.path)?.result === 'stay:duplicate'));
+          for (const it of order) {
+            if (shownFile.has(it.row.file_id)) continue; shownFile.add(it.row.file_id);
+            if (it.error) { invalid.push({ path: it.row.path, error: it.error }); continue; }
+            if (!tree.has(it.folder)) tree.set(it.folder, []);
+            tree.get(it.folder).push({ name: basename('/' + it.row.path), path: it.row.path, file_id: it.row.file_id });
+          }
+          const folder = (r[1] || '').replace(/\/+$/, '');
+          if (folder) {
+            const files = tree.get(folder) || [];
+            const sub = new Map();
+            for (const [f, list] of tree) if (f.startsWith(folder + '/')) { const nxt = f.slice(folder.length + 1).split('/')[0]; sub.set(nxt, (sub.get(nxt) || 0) + list.length); }
+            if (!files.length && !sub.size) throw new AppError(`no virtual folder "${folder}" in view ${v.name}`);
+            return { view: v.name, folder, folders: [...sub].map(([name, files]) => ({ name, files })), files };
+          }
+          const counts = {};
+          for (const [f, list] of tree) { const parts = f.split('/'); for (let i = 1; i <= parts.length; i++) { const k = parts.slice(0, i).join('/'); counts[k] = (counts[k] || 0) + list.length; } }
+          const lines = Object.keys(counts).sort((a, b) => cmpStr(a.toLowerCase(), b.toLowerCase())).map(k => `${'  '.repeat(k.split('/').length - 1)}${k.split('/').pop()}/  (${counts[k]})`);
+          return { view: v.name, template: v.template, filter: JSON.parse(v.filter), files: shownFile.size, tree: lines, invalid };
+        }
+        default: throw new UsageError('view set|list|activate|delete|show');
+      }
+    }
+    viewJson(v) { return { name: v.name, template: v.template, filter: JSON.parse(v.filter), none_names: JSON.parse(v.none_names), active: !!v.active }; }
+    cmdMaterialize(rest) {
+      const p = parseArgs(rest, { flags: ['apply', 'rename-conflicts'] });
+      const lib = this.openConfigured();
+      if (p._[0] === 'undo') return lib.undo_last(!!p.apply);
+      if (!p._[0]) throw new UsageError('materialize <view> [--rename-conflicts] [--apply] | materialize undo [--apply]');
+      const v = lib.getView(p._[0]);
+      return lib.materialize(v, { apply: !!p.apply, renameConflicts: !!p['rename-conflicts'], crashAfter: this.crashAfter });
+    }
+  }
+
+  G.Asscat = { App, Library, Db, AppError, HELP, bad_folder_name, norm_key, norm_value, DEFAULT_SETTINGS };
+})(typeof window !== 'undefined' ? window : globalThis);
+
+</script>
+<script>
+// Acceptance tests from spec chapter 10, run against the mock OS. Used by `selftest` in the
+// browser shell and by `node tests/run.js`. Attaches to globalThis.Selftest.
+(function (G) {
+  'use strict';
+  const { OS, Asscat, Gen, U } = G;
+  const LIB = '/Users/prokop/Pictures/Lib';
+  const T0 = Date.parse('2026-11-11T13:00:00Z') * 1e6;
+
+  function env(o = {}) {
+    const k = new OS.Kernel({ start: T0 });
+    const lib = o.lib || LIB;
+    if (!o.noLib) k.mkdir(lib, { p: true });
+    const e = {
+      k, lib,
+      cli(...args) {
+        const out = [], err = [];
+        const app = new Asscat.App(k, { cwd: e.lib, out: s => out.push(s), err: s => err.push(s) });
+        const code = app.run(args);
+        const text = out.join('\n'); let json = null;
+        try { json = JSON.parse(text); } catch { /* text */ }
+        return { code, json, text, err: err.join('\n') };
+      },
+      ok(...args) { const r = e.cli(...args); if (r.code !== 0) throw new Error(`asscat-cli ${args.join(' ')} -> exit ${r.code}: ${r.text}`); return r.json; },
+      write(rel, data, mtime) { const p = e.lib + '/' + rel; k.mkdir(OS.dirname(p), { p: true }); k.writeFile(p, data, mtime != null ? { mtime } : {}); k.advance(1e9); return p; },
+      db() { return Asscat.Db.parse(k.readFile(e.lib + '/.asscat/library.db')); },
+      row(rel) { return e.db().paths.get(rel); },
+      tick(s = 1) { k.advance(s * 1e9); },
+    };
+    return e;
+  }
+  function assert(c, msg) { if (!c) throw new Error(msg); }
+  function eq(a, b, msg) { const A = JSON.stringify(a), B = JSON.stringify(b); if (A !== B) throw new Error(`${msg}: expected ${B}, got ${A}`); }
+  const tagsOf = (e, rel) => e.ok('files', rel)[0].tags;
+  const resultOf = (plan, path) => plan.rows.find(r => r.path === path);
+
+  const tests = [
+    ['1 same content twice', () => {
+      const e = env(); e.write('a/x.jpg', 'SAME'); e.write('b/x.jpg', 'SAME');
+      e.ok('library', 'open', e.lib);
+      const db = e.db(); eq(db.files.size, 1, 'files rows'); eq(db.paths.size, 2, 'paths rows');
+    }],
+    ['2 move in Finder keeps identity, tags, history', () => {
+      const e = env(); e.write('alfa/x.jpg', 'PHOTO-1'); e.ok('library', 'open', e.lib);
+      e.ok('tag', 'add', 'klient', 'qila', 'alfa/x.jpg', '--yes');
+      const id = e.row('alfa/x.jpg').file_id;
+      e.k.mkdir(e.lib + '/c'); e.k.rename(e.lib + '/alfa/x.jpg', e.lib + '/c/y.jpg');
+      e.ok('sync');   // renamed too, so no cheap move match: it is re-hashed and lands on the same content row
+      eq(e.row('c/y.jpg').file_id, id, 'same file_id');
+      eq(tagsOf(e, 'c/y.jpg').klient, ['qila'], 'tags kept');
+      assert(e.db().history.some(h => h.file_id === id && h.path === 'alfa/x.jpg'), 'old path in history');
+      assert(e.ok('search', 'alfa').some(r => r.file_id === id), 'search finds old folder name (note: spec says "search a", but words < 2 chars are not indexed)');
+    }],
+    ['3 renamed folder: 200 files, no reads', () => {
+      const e = env(); e.k.mkdir(e.lib + '/old/sub', { p: true });
+      for (let i = 0; i < 200; i++) e.k.writeFile(`${e.lib}/old/${i % 2 ? 'sub/' : ''}f${i}.jpg`, 'c' + i);
+      e.ok('library', 'open', e.lib);
+      e.k.rename(e.lib + '/old', e.lib + '/new');
+      let reads = 0; e.k.trace = (op, p) => { if (p.startsWith(e.lib + '/') && !p.includes('/.asscat/')) reads++; };
+      const s = e.ok('sync'); e.k.trace = null;
+      eq([s.moved, s.moved_folders, s.hashed, s.new, s.gone], [200, 1, 0, 0, 0], '[moved, folders, hashed, new, gone]');
+      eq(reads, 0, 'file reads during sync');
+    }],
+    ['4 save over original -> edge + inherited tags (auto / ask / manual)', () => {
+      for (const mode of ['auto', 'ask', 'manual']) {
+        const e = env(); e.write('x.jpg', 'version-1'); e.ok('library', 'open', e.lib);
+        e.ok('setting', 'set', 'edge.same_path', JSON.stringify(mode));
+        e.ok('tag', 'add', 'klient', 'qila', 'x.jpg', '--yes');
+        const old = e.row('x.jpg').file_id;
+        e.write('x.jpg', 'version-2'); e.ok('sync');
+        const nw = e.row('x.jpg').file_id; assert(nw !== old, 'new file_id');
+        const edges = e.db().edges;
+        const t = tagsOf(e, 'x.jpg');
+        if (mode === 'manual') { eq(edges.length, 0, 'manual: no edge'); assert(!t.klient, 'manual: no tags'); continue; }
+        eq(edges.map(x => [x.from_id, x.to_id, x.origin, x.status]), [[old, nw, 'rule', mode === 'auto' ? 'confirmed' : 'suggested']], mode + ' edge');
+        if (mode === 'auto') eq(t.klient[0].value, 'qila', 'inherited'); else assert(!t.klient, 'ask: not inherited');
+      }
+    }],
+    ['5 revert edit A -> B -> A', () => {
+      const e = env(); e.write('x.jpg', 'AAAA'); e.ok('library', 'open', e.lib);
+      e.ok('tag', 'add', 'k', 'v', 'x.jpg', '--yes');
+      const A = e.row('x.jpg').file_id;
+      e.write('x.jpg', 'BBBB'); e.ok('sync'); const B = e.row('x.jpg').file_id;
+      e.write('x.jpg', 'AAAA'); e.ok('sync');
+      eq(e.row('x.jpg').file_id, A, 'path holds A again');
+      eq(e.db().edges.map(x => [x.from_id, x.to_id]).sort(), [[A, B], [B, A]].sort(), 'edges');
+      eq(tagsOf(e, 'x.jpg').k, ['v'], 'effective tags terminate');
+    }],
+    ['6 manual edge survives overwriting the original', () => {
+      const e = env(); e.write('raw.cr3', 'RAW-1'); e.write('edit.jpg', 'EDIT'); e.ok('library', 'open', e.lib);
+      e.ok('edge', 'add', 'raw.cr3', 'edit.jpg');
+      const raw1 = e.row('raw.cr3').file_id, ed = e.row('edit.jpg').file_id;
+      e.write('raw.cr3', 'RAW-2'); e.ok('sync'); const raw2 = e.row('raw.cr3').file_id;
+      const E = e.db().edges;
+      assert(E.some(x => x.from_id === raw1 && x.to_id === ed && x.origin === 'user'), 'user edge stays on old version');
+      assert(E.some(x => x.from_id === raw1 && x.to_id === raw2 && x.origin === 'rule'), 'rule edge old -> new');
+    }],
+    ['7 typo: qila / Qila is one value', () => {
+      const e = env(); e.write('a.jpg', '1'); e.write('b.jpg', '2'); e.ok('library', 'open', e.lib);
+      e.ok('tag', 'add', 'klient', 'qila', 'a.jpg', '--yes'); e.ok('tag', 'add', 'Klient', 'Qila', 'b.jpg', '--yes');
+      eq(e.ok('tag', 'values', 'klient'), [{ value: 'qila', files: 2 }], 'values');
+    }],
+    ['8 two clients and missing value', () => {
+      const t = U.parseLocal('2026-08-07 12:00', 60);
+      const e = env(); e.write('f1.jpg', 'one', t); e.write('f2.jpg', 'two', t); e.ok('library', 'open', e.lib);
+      e.ok('tag', 'add', 'klient', 'qila', 'f1.jpg', '--yes'); e.ok('tag', 'add', 'klient', 'lal', 'f1.jpg', '--yes');
+      e.ok('view', 'set', 'v', '{klient}/{rok}');
+      let p = e.ok('materialize', 'v');
+      eq(resultOf(p, 'f1.jpg').target, 'lal + qila/2026/f1.jpg', 'two clients'); eq(resultOf(p, 'f1.jpg').reason, '2 values: klient', 'reason');
+      eq(resultOf(p, 'f2.jpg').target, 'bez klient/2026/f2.jpg', 'no client');
+      e.ok('view', 'set', 'v', '{klient}/{rok}', '--none', 'klient=bez klienta');
+      p = e.ok('materialize', 'v'); eq(resultOf(p, 'f2.jpg').target, 'bez klienta/2026/f2.jpg', 'none name');
+    }],
+    ['9 invalid value', () => {
+      const e = env(); e.write('f.jpg', 'x'); e.ok('library', 'open', e.lib);
+      const pv = e.ok('tag', 'add', 'klient', 'A/B', 'f.jpg'); eq(pv.warning, "value can't be a folder name", 'warning'); eq(pv.applied, false, 'preview only');
+      e.ok('tag', 'add', 'klient', 'A/B', 'f.jpg', '--yes'); e.ok('view', 'set', 'v', '{klient}');
+      eq(resultOf(e.ok('materialize', 'v'), 'f.jpg').result, 'stay:invalid', 'result');
+    }],
+    ['10 name conflict', () => {
+      const e = env(); e.write('a/IMG_0001.JPG', 'older', T0 - 3600e9); e.write('b/IMG_0001.JPG', 'younger', T0 - 60e9);
+      e.ok('library', 'open', e.lib); e.ok('tag', 'add', 'shoot', 'S', 'a/', 'b/', '--yes'); e.ok('view', 'set', 'v', '{shoot}');
+      const p = e.ok('materialize', 'v');
+      eq([resultOf(p, 'a/IMG_0001.JPG').result, resultOf(p, 'b/IMG_0001.JPG').result], ['stay:conflict', 'stay:conflict'], 'without consent');
+      const r = e.ok('materialize', 'v', '--rename-conflicts', '--apply'); eq(r.done, 2, 'done');
+      eq(e.k.readFile(e.lib + '/S/IMG_0001.JPG'), 'older', 'older keeps name');
+      eq(e.k.readFile(e.lib + '/S/IMG_0001 (1).JPG'), 'younger', 'younger renamed');
+    }],
+    ['11 duplicate: older path moves', () => {
+      const e = env(); e.write('b/x.jpg', 'DUP'); e.ok('library', 'open', e.lib); e.tick(10);
+      e.write('a/x.jpg', 'DUP'); e.ok('sync');
+      e.ok('tag', 'add', 'klient', 'K', 'b/x.jpg', '--yes'); e.ok('view', 'set', 'v', '{klient}');
+      const p = e.ok('materialize', 'v');
+      eq([resultOf(p, 'b/x.jpg').result, resultOf(p, 'a/x.jpg').result], ['move', 'stay:duplicate'], 'results');
+    }],
+    ['12 locked folder + project file warning', () => {
+      const e = env(); e.write('Projekty/song.flp', 'flp'); e.write('Projekty/a.wav', 'wav'); e.write('loose.flp', 'flp2'); e.write('p.jpg', 'jpg');
+      e.ok('library', 'open', e.lib); e.ok('setting', 'set', 'materialize.locked', '["Projekty"]'); e.ok('view', 'set', 'v', '{druh}');
+      const p = e.ok('materialize', 'v');
+      eq([resultOf(p, 'Projekty/song.flp').result, resultOf(p, 'Projekty/a.wav').result], ['stay:locked', 'stay:locked'], 'locked');
+      eq(p.warnings[0].warning, 'project files present', 'warning'); eq(p.warnings[0].paths, ['loose.flp'], 'only outside locked');
+      e.ok('materialize', 'v', '--apply'); assert(e.k.exists(e.lib + '/Projekty/song.flp'), 'nothing moved under Projekty');
+    }],
+    ['13 crash in the middle + recovery', () => {
+      const e = env(); for (let i = 0; i < 10; i++) e.write(`in/f${i}.jpg`, 'c' + i);
+      e.ok('library', 'open', e.lib); e.ok('tag', 'add', 'klient', 'K', 'in/', '--yes'); e.ok('view', 'set', 'v', '{klient}');
+      const c = e.cli('--crash-after', '4', 'materialize', 'v', '--apply'); eq(c.code, 137, 'killed');
+      const info = e.ok('library'); eq(info.recovered, [{ op: 1, done: 4, skipped: 6, failed: 0 }], 'recovered');
+      const disk = []; const walk = d => { for (const n of e.k.readdir(d)) { const p = d + '/' + n; if (n === '.asscat') continue; e.k.stat(p).type === 'dir' ? walk(p) : disk.push(p.slice(e.lib.length + 1)); } }; walk(e.lib);
+      eq(disk.length, 10, 'no file lost or doubled');
+      eq([...e.db().paths.keys()].sort(), disk.sort(), 'paths == disk');
+      e.ok('materialize', 'v', '--apply'); eq(e.k.readdir(e.lib + '/K').length, 10, 'rerun finishes');
+    }],
+    ['14 undo last materialize', () => {
+      const e = env(); for (let i = 0; i < 3; i++) e.write(`in/f${i}.jpg`, 'u' + i);
+      e.ok('library', 'open', e.lib); e.ok('tag', 'add', 'klient', 'K', 'in/', '--yes'); e.ok('view', 'set', 'v', '{klient}');
+      e.ok('materialize', 'v', '--apply');
+      e.k.mkdir(e.lib + '/mine'); e.k.rename(e.lib + '/K/f1.jpg', e.lib + '/mine/f1.jpg');      // Finder move
+      const u = e.ok('materialize', 'undo', '--apply');
+      eq(u.done, 2, 'two back'); eq(u.stays.map(s => s.original), ['in/f1.jpg'], 'reported');
+      assert(e.k.exists(e.lib + '/in/f0.jpg') && e.k.exists(e.lib + '/mine/f1.jpg'), 'disk state');
+      eq(e.ok('materialize', 'undo').result, 'nothing to undo', 'only once');
+    }],
+    ['15 case change on case-insensitive disk', () => {
+      const e = env(); e.write('IMG.JPG', 'case'); e.ok('library', 'open', e.lib); const id = e.row('IMG.JPG').file_id;
+      e.k.rename(e.lib + '/IMG.JPG', e.lib + '/img.jpg');
+      eq(e.ok('sync').respelled, 1, 'respelled'); eq(e.row('img.jpg').file_id, id, 'same id'); assert(!e.row('IMG.JPG'), 'old spelling gone');
+    }],
+    ['16 NFC and NFD folders side by side on a case-sensitive disk', () => {
+      const e = env({ noLib: true }); e.k.createDisk({ name: 'CS', fs: 'apfs-cs' }); e.lib = '/Volumes/CS/lib'; e.k.mkdir(e.lib);
+      e.write('St\u0159ih/a.jpg', 'nfc'); e.write('St\u0159ih'.normalize('NFD') + '/b.jpg', 'nfd');
+      e.ok('library', 'open', e.lib); eq(e.db().paths.size, 2, 'two paths');
+      const s = e.ok('sync'); eq([s.unchanged, s.new, s.respelled], [2, 0, 0], 'paired by exact path');
+    }],
+    ['17 ignored files', () => {
+      const e = env(); e.write('Thumbs.db', 'x'); e.write('a.jpg', 'a'); const r = e.ok('library', 'open', e.lib);
+      assert(!e.row('Thumbs.db'), 'not in paths'); eq(r.sync.skipped.ignored, ['Thumbs.db'], 'reported as ignored');
+    }],
+    ['18 FAT and daylight saving time', () => {
+      const lib = new Asscat.Library({ k: null }, '/x'); lib.db = { library: { fs_mtime_step_ns: 2e9, fs_mtime_local: 1 } };
+      assert(lib.same_mtime(T0, T0 + 3600e9, lib), '1 h shift tolerated'); assert(!lib.same_mtime(T0, T0 + 1800e9 + 5e9, lib), 'other shift not');
+      const e = env({ noLib: true }); e.k.createDisk({ name: 'FAT', fs: 'msdos' }); e.lib = '/Volumes/FAT/lib'; e.k.mkdir(e.lib);
+      e.write('a.jpg', 'fat-a'); e.write('b.jpg', 'fat-b'); e.ok('library', 'open', e.lib);
+      e.k.tzMin = 120;                                   // timezone / DST change: FAT mtimes shift by 1 h
+      const s = e.ok('sync'); eq([s.unchanged, s.changed, s.hashed], [2, 0, 0], 'nothing hashed');
+    }],
+    ['19 deleted database', () => {
+      const e = env(); e.write('a.jpg', 'a'); e.ok('library', 'open', e.lib); e.k.unlink(e.lib + '/.asscat/library.db');
+      const r = e.cli('library', 'open', e.lib); eq(r.code, 1, 'exit'); assert(/missing or damaged/.test(r.json.error), 'message');
+      assert(!e.k.exists(e.lib + '/.asscat/library.db'), 'nothing created');
+      eq(e.ok('library', 'open', e.lib, '--start-over').created, true, 'start over');
+    }],
+    ['20 lock held by another process', () => {
+      const e = env(); e.ok('library', 'open', e.lib);
+      const other = new Asscat.App(e.k, { err() {} }); other.pid = e.k.spawn('asscat-cli', { host: 'MacBook-Studio' });
+      new Asscat.Library(other, e.lib).open();
+      const r = e.cli('library'); eq(r.code, 1, 'exit');
+      assert(/^the library is in use by asscat on MacBook-Studio since \d{4}-\d\d-\d\d \d\d:\d\d \(pid \d+\)$/.test(r.json.error), r.json.error);
+      e.k.exit(other.pid); e.ok('library');
+    }],
+    ['21 search', () => {
+      const e = env(); e.write('2009/Chorvatsko - Makarska/Den 3 pláž/IMG_1.jpg', 'beach'); e.write('Rodina/Babička.jpg', 'gran'); e.ok('library', 'open', e.lib);
+      eq(e.ok('search', 'makarska', 'plaz')[0].paths, ['2009/Chorvatsko - Makarska/Den 3 pláž/IMG_1.jpg'], 'makarska plaz');
+      eq(e.ok('search', 'babicka')[0].paths, ['Rodina/Babička.jpg'], 'babicka');
+    }],
+    ['22 import and shoots', () => {
+      const e = env(); e.ok('library', 'open', e.lib);
+      e.k.createDisk({ name: 'CARD', fs: 'exfat' }); Gen.card(e.k, '/Volumes/CARD');
+      const imp = e.ok('import', 'CARD'); eq([imp.imported, imp.filtered_out], [10, 1], '[imported, filtered_out]');
+      const prop = e.ok('shoots'); eq(prop.shoots.map(s => s.files.length), [6, 4], 'two shoots');
+      prop.shoots[0].name = 'Svatba Novákovi'; prop.shoots[0].klient = 'Qila';
+      e.k.writeFile('/tmp/proposal.json', JSON.stringify(prop));
+      e.ok('shoots', 'apply', '/tmp/proposal.json', '--yes');
+      const t = tagsOf(e, prop.shoots[0].files[0]); eq([t.shoot, t.klient], [['Svatba Novákovi'], ['Qila']], 'tags');
+      eq(e.ok('check', 'CARD').in_library.length, 10, 'card now fully in library');
+    }],
+  ];
+
+  function run(log = () => {}, only) {
+    let pass = 0, fail = 0; const failures = [];
+    for (const [name, fn] of tests) {
+      if (only && !name.startsWith(only + ' ')) continue;
+      try { fn(); pass++; log(`  ok   ${name}`); } catch (err) { fail++; failures.push([name, err]); log(`  FAIL ${name}\n       ${err.message}`); }
+    }
+    log(`${pass} passed, ${fail} failed`);
+    return { pass, fail, failures };
+  }
+  G.Selftest = { run, tests, env };
+})(typeof window !== 'undefined' ? window : globalThis);
+
+</script>
+<script>
+// A small unix-like shell over the mock kernel. Attaches to globalThis.Shell.
+(function (G) {
+  'use strict';
+  const { U, OS, Asscat, Gen } = G;
+  const { normPath, dirname, basename, join } = OS;
+  const HOME = '/Users/prokop';
+
+  class ShellError extends Error {}
+
+  // tokenizer: quotes, backslash escapes, operators ; && > >>
+  function tokenize(line) {
+    const out = []; let cur = null, i = 0, quoted = false;
+    const push = () => { if (cur !== null) out.push({ w: cur, q: quoted }); cur = null; quoted = false; };
+    while (i < line.length) {
+      const c = line[i];
+      if (c === '#' && cur === null) break;
+      if (/\s/.test(c)) { push(); i++; continue; }
+      if (c === ';') { push(); out.push({ op: ';' }); i++; continue; }
+      if (c === '&' && line[i + 1] === '&') { push(); out.push({ op: '&&' }); i += 2; continue; }
+      if (c === '>') { push(); if (line[i + 1] === '>') { out.push({ op: '>>' }); i += 2; } else { out.push({ op: '>' }); i++; } continue; }
+      if (c === '"' || c === "'") {
+        const q = c; i++; cur = cur ?? ''; quoted = true;
+        while (i < line.length && line[i] !== q) {
+          if (q === '"' && line[i] === '\\' && i + 1 < line.length) { const n = line[i + 1]; cur += n === 'n' ? '\n' : n === 'r' ? '\r' : n; i += 2; continue; }
+          cur += line[i++];
+        }
+        if (i >= line.length) throw new ShellError('unterminated quote');
+        i++; continue;
+      }
+      if (c === '\\' && i + 1 < line.length) { cur = (cur ?? '') + line[i + 1]; i += 2; continue; }
+      cur = (cur ?? '') + c; i++;
+    }
+    push();
+    return out;
+  }
+
+  const HELP = `Mock macOS-ish shell. Paths: absolute, relative, ~. Operators: ; && > >>
+files     ls [-la] [path]   cd   pwd   tree [path]   cat   stat   find [path] [-name pat]
+          mkdir [-p]   touch [-d "YYYY-MM-DD HH:MM"]   echo … [> file]   write <file> <text…>
+          rm [-r]   rmdir   mv (across disks = copy+delete, keeps dates)   cp [-r] [-p]   ln -s   chmod 000|644
+mock data genphotos <dir> <n> [--start "2026-08-07 10:00"] [--every 2m] [--prefix IMG_] [--ext JPG] [--first 1] [--kb 2]
+          mkfile <path> [--kb N] [--mtime "date"]
+disks     disk                               list disks
+          disk create <name> [--fs exfat|msdos|apfs|apfs-cs|hfs|smbfs] [--card]   plug in a new disk
+          disk eject <name>   disk mount <name>   disk destroy <name>
+time      date   clock +2h | -1d | set "2026-11-12 09:00"   tz <minutes east of UTC, e.g. 120>
+system    hostname [name]   ps   kill <pid>|%lock   io [reset]   (file read counter)
+          jsonset <file> <a.0.b> <value>   edit a JSON file in place
+          holdlock <folder> [--host NAME]    a separate process keeps the library locked
+app       asscat-cli … (alias asscat)      asscat help
+demo      demo   demo <name>   (then press Enter to step through)   selftest [n]
+ui        clear   reset   (state is saved in this browser's localStorage)`;
+
+  class Shell {
+    constructor(k, io = {}) {
+      this.k = k; this.cwd = HOME; this.out = io.out || (() => {}); this.err = io.err || (() => {});
+      this.queue = []; this.lastExit = 0;
+    }
+    path(p) { if (p === '~' || p.startsWith('~/')) p = HOME + p.slice(1); return normPath(p, this.cwd); }
+    prompt() { const c = this.cwd === HOME ? '~' : this.cwd.startsWith(HOME + '/') ? '~' + this.cwd.slice(HOME.length) : this.cwd; return `prokop@${this.k.hostname} ${c} %`; }
+
+    exec(line) {
+      let toks;
+      try { toks = tokenize(line); } catch (e) { this.err('sh: ' + e.message); return 2; }
+      // split into commands
+      const cmds = []; let cur = { argv: [], redir: null, sep: ';' };
+      for (let i = 0; i < toks.length; i++) {
+        const t = toks[i];
+        if (t.op === ';' || t.op === '&&') { cmds.push(cur); cur = { argv: [], redir: null, sep: t.op }; continue; }
+        if (t.op === '>' || t.op === '>>') { const f = toks[++i]; if (!f || f.op) { this.err('sh: missing file after ' + t.op); return 2; } cur.redir = { mode: t.op, file: f.w }; continue; }
+        cur.argv.push(t.q ? t.w : t.w);
+      }
+      cmds.push(cur);
+      let code = 0;
+      for (const c of cmds) {
+        if (c.sep === '&&' && code !== 0) break;
+        if (!c.argv.length) continue;
+        code = this.run1(c);
+      }
+      this.lastExit = code;
+      return code;
+    }
+    run1({ argv, redir }) {
+      const buf = [];
+      const out = redir ? s => buf.push(s) : this.out;
+      let code;
+      try { code = this.cmd(argv, out); }
+      catch (e) {
+        if (e instanceof OS.OSError) { this.err(`${argv[0]}: ${e.message}`); code = 1; }
+        else if (e instanceof ShellError) { this.err(`${argv[0]}: ${e.message}`); code = e.code || 1; }
+        else { this.err(`${argv[0]}: internal error: ${e.message}`); code = 1; }
+      }
+      if (redir) {
+        try {
+          const p = this.path(redir.file); const text = buf.join('\n') + (buf.length ? '\n' : '');
+          const prev = redir.mode === '>>' && this.k.exists(p) ? this.k.readFile(p) : '';
+          this.k.writeFile(p, prev + text);
+        } catch (e) { this.err(`sh: ${e.message}`); return 1; }
+      }
+      return code ?? 0;
+    }
+    flags(args, known) {
+      const f = {}, rest = [];
+      for (let i = 0; i < args.length; i++) {
+        const a = args[i];
+        if (a.startsWith('--') && known.opts && known.opts.includes(a.slice(2))) { f[a.slice(2)] = args[++i]; continue; }
+        if (/^-[a-zA-Z]+$/.test(a) && known.short) { for (const ch of a.slice(1)) { if (!known.short.includes(ch)) throw new ShellError(`unknown option -${ch}`); f[ch] = true; } continue; }
+        if (a.startsWith('--') && known.bool && known.bool.includes(a.slice(2))) { f[a.slice(2)] = true; continue; }
+        rest.push(a);
+      }
+      return [f, rest];
+    }
+    time(str) {
+      const t = U.parseLocal(str, this.k.tzMin);
+      if (t == null) throw new ShellError(`bad date "${str}" (use "YYYY-MM-DD HH:MM[:SS]")`);
+      return t;
+    }
+    lsLine(p, name) {
+      const st = this.k.stat(p);
+      const t = st.type === 'dir' ? 'd' : st.type === 'link' ? 'l' : '-';
+      const m = st.mode;
+      const perm = [6, 3, 0].map(s => ((m >> s) & 4 ? 'r' : '-') + ((m >> s) & 2 ? 'w' : '-') + ((m >> s) & 1 ? 'x' : '-')).join('');
+      const size = st.type === 'file' ? String(st.size) : '-';
+      return `${t}${perm}  ${size.padStart(7)}  ${U.fmtLocal(st.mtime_ns, this.k.tzMin)}  ${name}${st.type === 'dir' ? '/' : ''}${st.type === 'link' ? ' -> ' + st.target : ''}`;
+    }
+    copyTree(from, to, preserve) {
+      const st = this.k.stat(from);
+      if (st.type === 'dir') {
+        this.k.mkdir(to, { p: true });
+        for (const n of this.k.readdir(from)) this.copyTree(join(from, n), join(to, n), preserve);
+        if (preserve) this.k.utimes(to, st.mtime_ns);
+      } else if (st.type === 'link') this.k.symlink(st.target, to);
+      else this.k.copyFile(from, to, { preserve });
+    }
+    move(from, to) {
+      try { this.k.rename(from, to); }
+      catch (e) {
+        if (e.code !== 'EXDEV') throw e;
+        this.copyTree(from, to, true); this.k.rmTree(from);
+      }
+    }
+    target(src, dst) {           // mv/cp into an existing directory
+      return this.k.exists(dst) && this.k.stat(dst).type === 'dir' && !(this.k._lookup(dst) === this.k._lookup(src)) ? join(dst, basename(src)) : dst;
+    }
+
+    cmd(argv, out) {
+      const [c, ...a] = argv; const k = this.k;
+      switch (c) {
+        case 'help': out(HELP); return 0;
+        case 'pwd': out(this.cwd); return 0;
+        case 'cd': {
+          const p = this.path(a[0] || '~');
+          if (!k.exists(p)) throw new ShellError(`no such directory: ${a[0]}`);
+          if (k.stat(p).type !== 'dir') throw new ShellError(`not a directory: ${a[0]}`);
+          this.cwd = p; return 0;
+        }
+        case 'ls': {
+          const [f, r] = this.flags(a, { short: 'la1' });
+          const targets = r.length ? r : ['.'];
+          for (const t of targets) {
+            const p = this.path(t);
+            if (targets.length > 1) out(t + ':');
+            if (k.stat(p).type !== 'dir') { out(f.l ? this.lsLine(p, t) : t); continue; }
+            const names = k.readdir(p).filter(n => f.a || !n.startsWith('.'));
+            if (f.l) names.forEach(n => out(this.lsLine(join(p, n), n)));
+            else out(names.map(n => { const st = k.stat(join(p, n)); return n + (st.type === 'dir' ? '/' : ''); }).join('  '));
+          }
+          return 0;
+        }
+        case 'tree': {
+          const [f, r] = this.flags(a, { short: 'a' });
+          const root = this.path(r[0] || '.');
+          const lines = [r[0] || '.'];
+          const walk = (p, pre) => {
+            const names = k.readdir(p).filter(n => f.a || !n.startsWith('.'));
+            names.forEach((n, i) => {
+              const last = i === names.length - 1, q = join(p, n), st = k.stat(q);
+              lines.push(`${pre}${last ? '└── ' : '├── '}${n}${st.type === 'dir' ? '/' : ''}`);
+              if (st.type === 'dir') walk(q, pre + (last ? '    ' : '│   '));
+            });
+          };
+          walk(root, ''); out(lines.join('\n')); return 0;
+        }
+        case 'find': {
+          const i = a.indexOf('-name'); const pat = i >= 0 ? a[i + 1] : null;
+          const rest = a.filter((_, j) => j !== i && j !== i + 1 || i < 0);
+          const root = this.path(rest[0] || '.');
+          const re = pat ? new RegExp('^' + pat.replace(/[.+^${}()|[\]\\]/g, '\\$&').replace(/\*/g, '.*').replace(/\?/g, '.') + '$', 'i') : null;
+          const res = [];
+          const walk = p => { for (const n of k.readdir(p)) { const q = join(p, n); if (!re || re.test(n)) res.push(q); if (k.stat(q).type === 'dir') walk(q); } };
+          walk(root); out(res.join('\n')); return 0;
+        }
+        case 'cat': for (const p of a) out(k.readFile(this.path(p)).replace(/\n$/, '')); return 0;
+        case 'stat': for (const p of a) { const st = k.stat(this.path(p)); const fs = k.statfs(this.path(p)); out(JSON.stringify({ ...st, mtime: U.fmtLocal(st.mtime_ns, k.tzMin), fs: fs.f_fstypename }, null, 2)); } return 0;
+        case 'echo': out(a.join(' ')); return 0;
+        case 'write': { if (a.length < 1) throw new ShellError('write <file> <text…>   (creates parent folders)'); k.mkdir(dirname(this.path(a[0])), { p: true }); k.writeFile(this.path(a[0]), a.slice(1).join(' ')); return 0; }
+        case 'mkdir': { const [f, r] = this.flags(a, { short: 'p' }); for (const p of r) k.mkdir(this.path(p), { p: !!f.p }); return 0; }
+        case 'touch': {
+          const [f, r] = this.flags(a, { opts: ['d'], short: '' });
+          let d = null; const files = [];
+          for (let i = 0; i < r.length; i++) { if (r[i] === '-d') { d = r[++i]; continue; } files.push(r[i]); }
+          for (const p0 of files) {
+            const p = this.path(p0);
+            if (!k.exists(p)) k.writeFile(p, '');
+            k.utimes(p, d ? this.time(d) : k.now());
+          }
+          void f; return 0;
+        }
+        case 'rm': {
+          const [f, r] = this.flags(a, { short: 'rf' });
+          for (const p0 of r) {
+            const p = this.path(p0);
+            if (!k.exists(p)) { if (f.f) continue; throw new OS.OSError('ENOENT', 'no such file or directory', p0); }
+            if (k.stat(p).type === 'dir') { if (!f.r) throw new ShellError(`${p0}: is a directory (use -r)`); k.rmTree(p); } else k.unlink(p);
+          }
+          return 0;
+        }
+        case 'rmdir': for (const p of a) k.rmdir(this.path(p)); return 0;
+        case 'mv': {
+          if (a.length < 2) throw new ShellError('mv <src…> <dst>');
+          const dst = this.path(a[a.length - 1]);
+          for (const s of a.slice(0, -1)) { const src = this.path(s); this.move(src, this.target(src, dst)); }
+          return 0;
+        }
+        case 'cp': {
+          const [f, r] = this.flags(a, { short: 'rRpa' });
+          if (r.length < 2) throw new ShellError('cp [-r] [-p] <src…> <dst>');
+          const dst = this.path(r[r.length - 1]);
+          for (const s of r.slice(0, -1)) {
+            const src = this.path(s);
+            if (k.stat(src).type === 'dir' && !(f.r || f.R || f.a)) throw new ShellError(`${s} is a directory (not copied)`);
+            this.copyTree(src, this.target(src, dst), !!(f.p || f.a));
+          }
+          return 0;
+        }
+        case 'ln': { if (a[0] !== '-s' || a.length < 3) throw new ShellError('ln -s <target> <link>'); k.symlink(a[1], this.path(a[2])); return 0; }
+        case 'chmod': { if (a.length < 2) throw new ShellError('chmod <octal> <path…>'); for (const p of a.slice(1)) k.chmod(this.path(p), parseInt(a[0], 8)); return 0; }
+        case 'mkfile': {
+          const [f, r] = this.flags(a, { opts: ['kb', 'mtime'] });
+          for (const p0 of r) {
+            const p = this.path(p0); k.mkdir(dirname(p), { p: true });
+            k.writeFile(p, Gen.body(U.ext(p0) || 'bin', p + ':' + k.t, Number(f.kb || 1)), f.mtime ? { mtime: this.time(f.mtime) } : {});
+          }
+          return 0;
+        }
+        case 'genphotos': {
+          const [f, r] = this.flags(a, { opts: ['start', 'every', 'prefix', 'ext', 'first', 'kb', 'seed'] });
+          if (r.length < 2) throw new ShellError('genphotos <dir> <n> [--start "YYYY-MM-DD HH:MM"] [--every 2m] [--prefix IMG_] [--ext JPG]');
+          const list = Gen.photos(k, this.path(r[0]), Number(r[1]), {
+            start: f.start ? this.time(f.start) : undefined, every: f.every ? U.parseDuration(f.every) : undefined,
+            prefix: f.prefix, ext: f.ext, first: f.first ? Number(f.first) : undefined, kb: f.kb ? Number(f.kb) : undefined, seed: f.seed });
+          out(`created ${list.length} file(s) in ${r[0]}`); return 0;
+        }
+        case 'date': out(`${U.fmtLocal(k.now(), k.tzMin)} (UTC${U.tzString(k.tzMin)})`); return 0;
+        case 'clock': {
+          if (a[0] === 'set') { k.t = this.time(a.slice(1).join(' ')); }
+          else if (a[0]) { const d = U.parseDuration(a[0]); if (d == null) throw new ShellError('clock +2h | -1d | set "YYYY-MM-DD HH:MM"'); k.advance(d); }
+          out(U.fmtLocal(k.now(), k.tzMin)); return 0;
+        }
+        case 'tz': {
+          if (a[0] != null) { const m = Number(a[0]); if (!Number.isFinite(m)) throw new ShellError('tz <minutes east of UTC>, e.g. tz 120'); k.tzMin = m; }
+          out(`UTC${U.tzString(k.tzMin)}  (FAT/exFAT disks store local time, so their mtimes shift when this changes)`); return 0;
+        }
+        case 'hostname': if (a[0]) k.hostname = a[0]; out(k.hostname); return 0;
+        case 'io': if (a[0] === 'reset') { k.io.reads = 0; k.io.bytes = 0; k.io.media = 0; } out(`file reads: ${k.io.media} outside hidden folders (${k.io.reads} total incl. .asscat / config), ${k.io.bytes} bytes`); return 0;
+        case 'ps': out('  PID  HOST              COMMAND'); for (const p of k.procs.values()) out(`${String(p.pid).padStart(5)}  ${p.host.padEnd(16)}  ${p.name}`); return 0;
+        case 'kill': {
+          if (a[0] === '%lock') { const ps = [...k.procs.values()].filter(p => p.name.includes('holding lock')); ps.forEach(p => k.exit(p.pid)); out(`killed ${ps.map(p => p.pid).join(', ') || 'nothing'}`); return 0; }
+          const pid = Number(a[0]); if (!k.procs.has(pid)) throw new ShellError(`no such process ${a[0]}`); k.exit(pid); out(`killed ${pid}`); return 0; }
+        case 'holdlock': {
+          const [f, r] = this.flags(a, { opts: ['host'] });
+          if (!r[0]) throw new ShellError('holdlock <library folder> [--host NAME]');
+          const app = new Asscat.App(k, { cwd: this.cwd, err: () => {} });
+          app.pid = k.spawn('asscat-cli (holding lock)', { host: f.host });
+          try { new Asscat.Library(app, this.path(r[0])).open(); }
+          catch (e) { k.exit(app.pid); throw new ShellError(e.message); }
+          out(`pid ${app.pid} now holds the library lock (stop it with: kill ${app.pid})`); return 0;
+        }
+        case 'disk': case 'df': case 'mount': return this.diskCmd(c === 'disk' ? a : [], out);
+        case 'asscat': case 'asscat-cli': {
+          const app = new Asscat.App(k, { cwd: this.cwd, out, err: this.err });
+          return app.run(a);
+        }
+        case 'selftest': { const r = G.Selftest.run(s => out(s), a[0]); return r.fail ? 1 : 0; }
+        case 'demo': return this.demoCmd(a, out);
+        case 'jsonset': {
+          if (a.length < 3) throw new ShellError('jsonset <file> <a.0.b> <value>   (value parsed as JSON, else string)');
+          const p = this.path(a[0]); const j = JSON.parse(k.readFile(p));
+          const keys = a[1].split('.'); let o = j;
+          for (const key of keys.slice(0, -1)) { if (o[key] == null) throw new ShellError(`no ${key} in ${a[1]}`); o = o[key]; }
+          let v; try { v = JSON.parse(a[2]); } catch { v = a[2]; }
+          o[keys[keys.length - 1]] = v; k.writeFile(p, JSON.stringify(j, null, 2)); return 0;
+        }
+        default: throw new ShellError(`command not found (try "help")`);
+      }
+    }
+    diskCmd(a, out) {
+      const k = this.k; const [sub, ...r] = a;
+      if (!sub || sub === 'list') {
+        out('NAME              FS        MOUNTED AT');
+        for (const d of k.disks()) out(`${d.name.padEnd(16)}  ${d.fs.padEnd(8)}  ${d.mountedAt || '(ejected)'}    ${d.label}`);
+        return 0;
+      }
+      const [f, rest] = this.flags(r, { opts: ['fs'], bool: ['card'] });
+      const name = rest[0]; if (!name) throw new ShellError(`disk ${sub} <name>`);
+      switch (sub) {
+        case 'create': {
+          const v = k.createDisk({ name, fs: f.fs || 'exfat' });
+          if (f.card) Gen.card(k, v.mountedAt);
+          out(`attached "${name}" (${v.prof.label}) at ${v.mountedAt}${f.card ? ' with camera files in DCIM/' : ''}`); return 0;
+        }
+        case 'eject': k.ejectDisk(name); out(`ejected ${name}`); return 0;
+        case 'mount': out(`mounted at ${k.mountDisk(name)}`); return 0;
+        case 'destroy': k.destroyDisk(name); out(`destroyed ${name}`); return 0;
+        default: throw new ShellError('disk [list|create|eject|mount|destroy]');
+      }
+    }
+    demoCmd(a, out) {
+      const D = G.Demos;
+      if (!a[0]) { out('demos (run "demo <name>", then press Enter on an empty line to step):'); for (const [n, d] of Object.entries(D)) out(`  ${n.padEnd(10)} ${d.title}`); return 0; }
+      if (a[0] === 'stop') { this.queue = []; out('demo stopped'); return 0; }
+      const d = D[a[0]]; if (!d) throw new ShellError(`no demo ${a[0]}`);
+      this.queue = d.steps.slice(); out(`# ${d.title} — ${this.queue.filter(x => !x.startsWith('#')).length} commands. Press Enter on an empty line to run the next one ("demo stop" to quit).`);
+      return 0;
+    }
+  }
+
+  G.Shell = { Shell, tokenize, HOME };
+})(typeof window !== 'undefined' ? window : globalThis);
+
+</script>
+<script>
+// Guided walkthroughs. Lines starting with '#' are narration. Run them in order (1 → 6).
+(function (G) {
+  'use strict';
+  const M = '"2009/Chorvatsko - Makarska/Den 3 pláž/IMG_0001.JPG"';
+  G.Demos = {
+    tour: { title: '1. Library, identity by content, moves, search', steps: [
+      '# Mock files on the internal disk (APFS, case-insensitive).',
+      'mkdir -p ~/Pictures/Knihovna && cd ~/Pictures/Knihovna',
+      'genphotos "2009/Chorvatsko - Makarska/Den 3 pláž" 6 --start "2009-07-14 10:00" --every 15m',
+      'genphotos Rodina 4 --prefix Babička_ --start "2026-08-07 15:00"',
+      'cp -p Rodina/Babička_0001.JPG Rodina/kopie.JPG',
+      'write Thumbs.db junk',
+      'tree',
+      '# Create the library. Same bytes on two paths = one "files" row, two "paths" rows. Thumbs.db is ignored.',
+      'asscat library open .',
+      'asscat db',
+      'asscat files Rodina/kopie.JPG',
+      '# Rename a folder "in Finder": paired by folder signature (names, sizes, mtimes) — no file is read.',
+      'io reset',
+      'mv Rodina "Rodina 2026"',
+      'asscat sync',
+      'io',
+      '# Move + rename one file: no cheap match, so it is re-hashed; it lands on the same content row, the old path goes to history.',
+      'mv "Rodina 2026/Babička_0002.JPG" b2.JPG',
+      'asscat sync',
+      'asscat files b2.JPG',
+      '# Search: words from current and old paths and tags, diacritics-insensitive, prefix match.',
+      'asscat search makarska plaz',
+      'asscat search babick',
+      'asscat search rodina',
+      '# Limitation: words shorter than 2 characters are not indexed.',
+      'asscat search a',
+    ] },
+    edits: { title: '2. Tags, edits of originals, edges, inheritance', steps: [
+      'cd ~/Pictures/Knihovna',
+      'asscat tag add klient Qila 2009/',
+      '# ↑ preview only. --yes applies.',
+      'asscat tag add klient Qila 2009/ --yes',
+      'asscat tag add klient qila "Rodina 2026/" --yes',
+      '# ↑ typo-tolerant: the existing spelling "Qila" wins.',
+      'asscat tag values klient',
+      '# Save over the original (what an editor does): new content -> new file_id + rule edge; tags inherited.',
+      `write ${M} retouched pixels`,
+      'asscat sync',
+      `asscat files ${M}`,
+      `asscat edge list ${M}`,
+      '# Manual edge RAW -> exported JPG; the export inherits the RAW\'s tags.',
+      'mkfile raw/DSC1.CR3 --kb 3 && mkfile export/DSC1.jpg',
+      'asscat sync',
+      'asscat tag add shoot Svatba raw/ --yes',
+      'asscat edge add raw/DSC1.CR3 export/DSC1.jpg',
+      'asscat files export/DSC1.jpg',
+      '# Mode "ask": an overwrite only suggests an edge, tags do not flow until confirmed.',
+      'asscat setting set edge.same_path \'"ask"\'',
+      'write raw/DSC1.CR3 re-developed raw',
+      'asscat sync',
+      'asscat edge list raw/DSC1.CR3',
+      'asscat setting set edge.same_path \'"auto"\'',
+      '# Removing an inherited tag only works on the original:',
+      `asscat tag remove klient Qila ${M}`,
+    ] },
+    card: { title: '3. Plug in a camera card, check, import, shoots', steps: [
+      'cd ~/Pictures/Knihovna',
+      'disk create SONY_A7 --fs exfat --card',
+      'tree /Volumes/SONY_A7',
+      'asscat volumes',
+      'asscat check SONY_A7',
+      'asscat import SONY_A7',
+      '# Copied into _inbox with verification; second check finds everything in the library.',
+      'asscat check SONY_A7',
+      'asscat shoots 2h 3 > /tmp/proposal.json',
+      'cat /tmp/proposal.json',
+      '# Fill in names (or edit the file in the Finder pane).',
+      'jsonset /tmp/proposal.json shoots.0.name "Svatba Novákovi"',
+      'jsonset /tmp/proposal.json shoots.0.klient lal',
+      'jsonset /tmp/proposal.json shoots.1.name Ateliér',
+      'asscat shoots apply /tmp/proposal.json --yes',
+      'asscat tag values shoot',
+      'disk eject SONY_A7',
+    ] },
+    views: { title: '4. Views, preview, materialize, conflicts, undo', steps: [
+      'cd ~/Pictures/Knihovna',
+      'asscat view set klienti "{klient}/{rok}/{shoot}" --none "klient=bez klienta" --none "shoot=bez shootu"',
+      'asscat view show klienti',
+      'asscat view show klienti "Qila/2009"',
+      'asscat view set archiv "Archiv/{rok}/{mesic}" --filter druh=foto',
+      'asscat view show archiv',
+      '# Preview: per path move / stay:in_place / stay:duplicate / stay:conflict / stay:invalid / stay:pending ...',
+      'asscat materialize klienti',
+      'asscat materialize klienti --apply',
+      'tree',
+      'asscat materialize undo',
+      'asscat materialize undo --apply',
+      'tree',
+      '# Name conflict: two different IMG_0001.JPG want the same target.',
+      'genphotos A 1 --seed a --start "2026-03-01 10:00" && genphotos B 1 --seed b --start "2026-03-02 10:00"',
+      'asscat sync',
+      'asscat tag add shoot Kolize A/ B/ --yes',
+      'asscat view set kolize "{shoot}" --filter shoot=Kolize',
+      'asscat materialize kolize',
+      'asscat materialize kolize --rename-conflicts --apply',
+      'ls -l Kolize',
+      '# Invalid value as folder name:',
+      'asscat tag add klient "A/B" Kolize/ --yes',
+      'asscat materialize klienti',
+    ] },
+    crash: { title: '5. Crash during materialize, recovery, locked folders', steps: [
+      'cd ~/Pictures/Knihovna',
+      'asscat setting set materialize.locked \'["raw"]\'',
+      'mkfile raw/song.flp && mkfile song2.flp',
+      'asscat sync',
+      'asscat materialize klienti',
+      '# ↑ raw/ is locked (stay:locked); a project file outside it triggers a warning.',
+      '# Now the process dies after 3 renames (debug flag):',
+      'asscat --crash-after 3 materialize klienti --apply',
+      'cat .asscat/lock',
+      '# The OS released the lock with the process; the journal (ops/op_steps) is compared with the disk on next open:',
+      'asscat library',
+      'asscat db ops',
+      'asscat materialize klienti --apply',
+      'ls .asscat/backups',
+    ] },
+    limits: { title: '6. Edge cases and limits (FAT, case, unreadable, lock, lost DB)', steps: [
+      '# A library on an old FAT stick: 2 s mtimes in LOCAL time.',
+      'disk create OLDUSB --fs msdos',
+      'genphotos /Volumes/OLDUSB/Fotky 4 --start "2026-07-01 09:00"',
+      'cd /Volumes/OLDUSB/Fotky && asscat library open .',
+      'ls -l',
+      'tz 120',
+      'ls -l',
+      '# ↑ every mtime moved by 1 h. sync tolerates whole 15-min shifts on FAT/exFAT and hashes nothing:',
+      'asscat sync',
+      'tz 60',
+      '# Case-only rename on a case-insensitive disk -> "respelled", same file_id.',
+      'mv IMG_0001.JPG img_0001.jpg && asscat sync',
+      '# Limit: move AND edit between two syncs -> identity lost: new file, old one only in history, no edge.',
+      'mv IMG_0002.JPG moved.JPG && write moved.JPG edited after move && asscat sync',
+      'asscat files moved.JPG',
+      '# Unreadable file stays without file_id (read_error), never "already in library".',
+      'mkfile secret.JPG && chmod 000 secret.JPG && asscat sync',
+      'asscat files secret.JPG',
+      '# Another process holds the library:',
+      'holdlock . --host MacBook-Studio',
+      'asscat library',
+      'ps',
+      'kill %lock',
+      '# Deleted database: nothing is silently re-created.',
+      'rm .asscat/library.db',
+      'asscat library',
+      'ls -a .asscat',
+      'asscat library open . --start-over',
+      '# back to the main library',
+      'cd ~/Pictures/Knihovna && asscat library open .',
+    ] },
+  };
+})(typeof window !== 'undefined' ? window : globalThis);
+
+</script>
+<script>
+// Browser UI: terminal + Finder-like browser over one shared mock kernel.
+(function () {
+  'use strict';
+  const { U, OS, Shell } = window;
+  const { join, dirname, basename } = OS;
+  const KEY = 'asscat-demo-os-v1';
+  const $ = id => document.getElementById(id);
+
+  // ---------- boot / persistence ----------
+  let k, sh;
+  function boot(fresh) {
+    let saved = null;
+    if (!fresh) try { saved = JSON.parse(localStorage.getItem(KEY) || 'null'); } catch { saved = null; }
+    try { k = saved ? OS.Kernel.fromJSON(saved.kernel, { realtime: true }) : new OS.Kernel({ realtime: true, start: Date.now() * 1e6 }); }
+    catch { k = new OS.Kernel({ realtime: true, start: Date.now() * 1e6 }); saved = null; }
+    sh = new Shell.Shell(k, { out: s => print(s), err: s => print(s, 'err') });
+    if (saved && saved.cwd && k.exists(saved.cwd)) sh.cwd = saved.cwd;
+    finder.cwd = saved && saved.fcwd && k.exists(saved.fcwd) ? saved.fcwd : Shell.HOME;
+    k.listeners.push(() => scheduleRender());
+    return !!saved;
+  }
+  function save() {
+    try { localStorage.setItem(KEY, JSON.stringify({ kernel: k.toJSON(), cwd: sh.cwd, fcwd: finder.cwd })); } catch { /* storage full or blocked */ }
+  }
+
+  // ---------- terminal ----------
+  const out = $('out'), input = $('in');
+  const hist = []; let hi = 0;
+  function print(text, cls) {
+    const d = document.createElement('div'); if (cls) d.className = cls; d.textContent = text; out.appendChild(d);
+    if (out.childNodes.length > 4000) out.removeChild(out.firstChild);
+    out.scrollTop = out.scrollHeight;
+  }
+  function runLine(line) {
+    print(`${sh.prompt()} ${line}`, 'cmd');
+    const t = line.trim();
+    if (t === 'clear') { out.textContent = ''; return; }
+    if (t === 'reset') { if (confirm('Erase all mock disks and the library?')) { localStorage.removeItem(KEY); k.listeners = []; boot(true); out.textContent = ''; welcome(); render(); } return; }
+    if (t) { const code = sh.exec(line); if (code) print(`[exit ${code}]`, 'err'); }
+    save(); render();
+  }
+  function stepDemo() {
+    while (sh.queue.length && sh.queue[0].startsWith('#')) print(sh.queue.shift(), 'note');
+    if (sh.queue.length) runLine(sh.queue.shift());
+    while (sh.queue.length && sh.queue[0].startsWith('#')) print(sh.queue.shift(), 'note');
+    if (!sh.queue.length) print('# end of demo — "demo" lists the next one', 'note');
+  }
+  function complete() {
+    const v = input.value, m = /(\S*)$/.exec(v), word = m[1].replace(/^["']/, '');
+    const dirPart = word.includes('/') ? word.slice(0, word.lastIndexOf('/') + 1) : '';
+    const base = word.slice(dirPart.length);
+    let names; try { names = k.readdir(sh.path(dirPart || '.')); } catch { return; }
+    const hits = names.filter(n => n.startsWith(base) && (base.startsWith('.') || !n.startsWith('.')));
+    if (!hits.length) return;
+    if (hits.length > 1) {
+      let pre = hits[0]; for (const h of hits) while (!h.startsWith(pre)) pre = pre.slice(0, -1);
+      if (pre.length > base.length) input.value = v.slice(0, v.length - base.length) + pre;
+      else print(hits.join('  '), 'err');
+      return;
+    }
+    let full = dirPart + hits[0]; let isDir = false;
+    try { isDir = k.stat(sh.path(full)).type === 'dir'; } catch { /* ignore */ }
+    if (/\s/.test(full)) full = '"' + full + (isDir ? '/' : '"'); else if (isDir) full += '/';
+    input.value = v.slice(0, v.length - m[1].length) + full;
+  }
+  input.addEventListener('keydown', e => {
+    if (e.key === 'Enter') {
+      const v = input.value; input.value = '';
+      if (!v.trim() && sh.queue.length) { stepDemo(); return; }
+      if (v.trim()) { hist.push(v); hi = hist.length; }
+      runLine(v);
+    } else if (e.key === 'ArrowUp') { if (hi > 0) input.value = hist[--hi]; e.preventDefault(); }
+    else if (e.key === 'ArrowDown') { if (hi < hist.length) input.value = hist[++hi] ?? ''; e.preventDefault(); }
+    else if (e.key === 'Tab') { e.preventDefault(); complete(); }
+    else if (e.key === 'l' && e.ctrlKey) { e.preventDefault(); out.textContent = ''; }
+  });
+  $('term').addEventListener('click', () => { if (!window.getSelection().toString()) input.focus(); });
+
+  // ---------- finder ----------
+  const finder = { cwd: Shell.HOME, sel: new Set(), clip: null };
+  function fstat(msg, bad) { const s = $('fstat'); s.textContent = msg || ''; s.className = bad ? 'bad' : ''; }
+  function act(fn) { try { fn(); fstat(''); } catch (e) { fstat(e.message, true); } save(); render(); }
+  function selected() { return [...finder.sel].map(n => join(finder.cwd, n)); }
+  function go(p) { if (!k.exists(p) || k.stat(p).type !== 'dir') { fstat(`not a folder: ${p}`, true); return; } finder.cwd = p; finder.sel.clear(); save(); render(); }
+  function openFile(p) {
+    const dlg = $('dlg'); $('dlgTitle').textContent = p; let text;
+    try { text = k.readFile(p); } catch (e) { fstat(e.message, true); return; }
+    $('dlgText').value = text; dlg.returnValue = '';
+    dlg.onclose = () => { if (dlg.returnValue === 'save') act(() => k.writeFile(p, $('dlgText').value)); };
+    dlg.showModal();
+  }
+  function moveInto(paths, dest) {
+    act(() => { for (const p of paths) { const t = join(dest, basename(p)); if (k.exists(t) && k._lookup(t) !== k._lookup(p)) throw new Error(`"${basename(p)}" already exists in ${dest}`); sh.move(p, t); } });
+  }
+  const actions = {
+    up: () => go(dirname(finder.cwd)),
+    mkdir: () => { const n = prompt('New folder name', 'untitled folder'); if (n) act(() => k.mkdir(join(finder.cwd, n))); },
+    newfile: () => { const n = prompt('New file name', 'untitled.txt'); if (n) act(() => { const p = join(finder.cwd, n); if (k.exists(p)) throw new Error('already exists'); k.writeFile(p, ''); }); },
+    edit: () => { const [p] = selected(); if (p && k.stat(p).type === 'file') openFile(p); else fstat('select a file', true); },
+    rename: () => { const [p] = selected(); if (!p) return fstat('select an item', true); const n = prompt('Rename to', basename(p)); if (n && n !== basename(p)) act(() => { k.rename(p, join(finder.cwd, n), { noReplace: true }); finder.sel = new Set([n]); }); },
+    cut: () => { finder.clip = { mode: 'cut', paths: selected() }; fstat(`${finder.clip.paths.length} item(s) cut — open a folder and Paste`); },
+    copy: () => { finder.clip = { mode: 'copy', paths: selected() }; fstat(`${finder.clip.paths.length} item(s) copied`); },
+    paste: () => {
+      const c = finder.clip; if (!c || !c.paths.length) return fstat('clipboard is empty', true);
+      if (c.mode === 'cut') { moveInto(c.paths, finder.cwd); finder.clip = null; return; }
+      act(() => { for (const p of c.paths) { let t = join(finder.cwd, basename(p)); for (let i = 2; k.exists(t); i++) t = join(finder.cwd, `${U.stem(basename(p))} ${i}${U.ext(basename(p)) ? '.' + U.ext(basename(p)) : ''}`); sh.copyTree(p, t, true); } });
+    },
+    delete: () => { const ps = selected(); if (ps.length && confirm(`Delete ${ps.length} item(s)? (no trash in this mock OS)`)) act(() => { ps.forEach(p => k.rmTree(p)); finder.sel.clear(); }); },
+    date: () => {
+      const ps = selected(); if (!ps.length) return fstat('select items', true);
+      const cur = U.fmtLocal(k.stat(ps[0]).mtime_ns, k.tzMin);
+      const v = prompt('Modification time (local, YYYY-MM-DD HH:MM[:SS])', cur); if (!v) return;
+      act(() => { const t = U.parseLocal(v, k.tzMin); if (t == null) throw new Error('bad date'); ps.forEach(p => k.utimes(p, t)); });
+    },
+    term: () => { sh.cwd = finder.cwd; render(); input.focus(); },
+  };
+  document.querySelectorAll('#ftool button[data-a]').forEach(b => b.addEventListener('click', () => actions[b.dataset.a]()));
+  $('hidden').addEventListener('change', render);
+  $('fpath').addEventListener('keydown', e => { if (e.key === 'Enter') { const v = e.target.value.trim().replace(/^~(?=$|\/)/, Shell.HOME); go(OS.normPath(v, finder.cwd)); } });
+
+  function dropTarget(el, dest) {
+    el.addEventListener('dragover', e => { e.preventDefault(); el.classList.add('drop'); });
+    el.addEventListener('dragleave', () => el.classList.remove('drop'));
+    el.addEventListener('drop', e => {
+      e.preventDefault(); el.classList.remove('drop');
+      let paths; try { paths = JSON.parse(e.dataTransfer.getData('text/plain')); } catch { return; }
+      if (paths.includes(dest)) return;
+      moveInto(paths, dest);
+    });
+  }
+  function renderSide() {
+    const side = $('side'); side.textContent = '';
+    const h = t => { const e = document.createElement('h4'); e.textContent = t; side.appendChild(e); };
+    const item = (label, path, extra) => {
+      const d = document.createElement('div'); d.className = 'it'; const s = document.createElement('span'); s.textContent = label; d.appendChild(s);
+      d.title = path; d.onclick = () => go(path); dropTarget(d, path);
+      if (extra) d.appendChild(extra); side.appendChild(d);
+    };
+    h('Places');
+    for (const [l, p] of [['Home', Shell.HOME], ['Pictures', Shell.HOME + '/Pictures'], ['Desktop', Shell.HOME + '/Desktop'], ['tmp', '/tmp']]) if (k.exists(p)) item(l, p);
+    h('Disks');
+    for (const d of k.disks()) {
+      if (!d.mountedAt) continue;
+      let ej = null;
+      if (d.removable) { ej = document.createElement('span'); ej.className = 'ej'; ej.textContent = '⏏'; ej.title = 'Eject'; ej.onclick = e => { e.stopPropagation(); act(() => { if (finder.cwd.startsWith(d.mountedAt)) finder.cwd = Shell.HOME; k.ejectDisk(d.name); }); }; }
+      item(`${d.name} (${d.fs})`, d.mountedAt === '/' ? '/' : d.mountedAt, ej);
+    }
+    const ejected = k.disks().filter(d => !d.mountedAt);
+    if (ejected.length) { h('Unplugged'); for (const d of ejected) { const x = document.createElement('div'); x.className = 'it'; x.textContent = `⏏ ${d.name}`; x.title = 'Plug back in'; x.onclick = () => act(() => k.mountDisk(d.name)); side.appendChild(x); } }
+    const add = document.createElement('button'); add.textContent = '+ Plug in disk'; add.style.marginTop = '10px';
+    add.onclick = () => {
+      const name = prompt('Disk name', 'CARD'); if (!name) return;
+      const fs = prompt('Filesystem: exfat, msdos, apfs, apfs-cs, hfs, smbfs', 'exfat'); if (!fs) return;
+      const card = confirm('Fill it with camera files (DCIM)?');
+      act(() => { const v = k.createDisk({ name, fs }); if (card) window.Gen.card(k, v.mountedAt); finder.cwd = v.mountedAt; });
+    };
+    side.appendChild(add);
+  }
+  function renderList() {
+    const list = $('flist'); list.textContent = '';
+    if (!k.exists(finder.cwd)) finder.cwd = Shell.HOME;
+    $('fpath').value = finder.cwd;
+    const showHidden = $('hidden').checked;
+    let names; try { names = k.readdir(finder.cwd); } catch (e) { fstat(e.message, true); return; }
+    names = names.filter(n => showHidden || !n.startsWith('.'));
+    const tbl = document.createElement('table');
+    tbl.innerHTML = '<thead><tr><th>Name</th><th style="text-align:right">Size</th><th>Modified</th></tr></thead>';
+    const tb = document.createElement('tbody');
+    const dirs = [], files = [];
+    for (const n of names) { const st = k.stat(join(finder.cwd, n)); (st.type === 'dir' ? dirs : files).push([n, st]); }
+    for (const [n, st] of [...dirs, ...files]) {
+      const p = join(finder.cwd, n);
+      const tr = document.createElement('tr'); tr.className = 'row' + (finder.sel.has(n) ? ' sel' : ''); tr.draggable = true;
+      const icon = st.type === 'dir' ? '📁 ' : st.type === 'link' ? '↪ ' : '📄 ';
+      const c1 = document.createElement('td'); c1.textContent = icon + n + (st.type === 'link' ? ' → ' + st.target : '') + (st.mode & 0o444 ? '' : '  🔒');
+      const c2 = document.createElement('td'); c2.className = 'num'; c2.textContent = st.type === 'file' ? U.fmtSize(st.size) : (st.type === 'dir' ? `${st.size} items` : '');
+      const c3 = document.createElement('td'); c3.className = 'dim'; c3.textContent = U.fmtLocal(st.mtime_ns, k.tzMin);
+      tr.append(c1, c2, c3);
+      tr.onclick = e => { if (!(e.metaKey || e.ctrlKey)) finder.sel.clear(); finder.sel.has(n) && (e.metaKey || e.ctrlKey) ? finder.sel.delete(n) : finder.sel.add(n); renderList(); };
+      tr.ondblclick = () => { if (st.type === 'dir') go(p); else if (st.type === 'file') openFile(p); };
+      tr.addEventListener('dragstart', e => { if (!finder.sel.has(n)) { finder.sel = new Set([n]); } e.dataTransfer.setData('text/plain', JSON.stringify(selected())); });
+      if (st.type === 'dir') dropTarget(tr, p);
+      tb.appendChild(tr);
+    }
+    tbl.appendChild(tb); list.appendChild(tbl);
+    if (!names.length) { const e = document.createElement('div'); e.style.cssText = 'padding:16px;color:var(--muted)'; e.textContent = 'empty folder'; list.appendChild(e); }
+    for (const n of [...finder.sel]) if (!names.includes(n)) finder.sel.delete(n);
+  }
+  let pending = false;
+  function scheduleRender() { if (pending) return; pending = true; requestAnimationFrame(() => { pending = false; render(); }); }
+  function render() {
+    $('prompt').textContent = sh.prompt();
+    const nx = $('next');
+    const next = sh.queue.find(s => !s.startsWith('#'));
+    nx.style.display = next ? 'block' : 'none'; nx.textContent = next ? `▶ Enter runs: ${next}` : '';
+    renderSide(); renderList();
+  }
+  setInterval(() => { $('clock').textContent = `${U.fmtLocal(k.now(), k.tzMin, false)} UTC${U.tzString(k.tzMin)} · ${k.hostname}`; }, 1000);
+
+  $('bDemo').onclick = () => { runLine('demo tour'); input.focus(); };
+  $('bTest').onclick = () => { runLine('selftest'); input.focus(); };
+  $('bReset').onclick = () => runLine('reset');
+
+  function welcome() {
+    print('Asscat demo on a mock unix-like OS. Nothing here touches your real disk; state lives in this browser tab (localStorage).', 'note');
+    print('Type "help" for shell commands, "asscat help" for the app, "demo" for guided walkthroughs (run them in order), "selftest" for the spec\'s 22 acceptance tests.', 'note');
+    print('The right pane is an independent file browser: drag rows onto folders to move, double-click a file to edit it, plug in disks in the sidebar.', 'note');
+  }
+  const restored = boot(false);
+  welcome();
+  if (restored) print('(restored previous state — "reset" to start over)', 'err');
+  render();
+})();
+
+</script>
+</body>
+</html>

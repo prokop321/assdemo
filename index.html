@@ -1,0 +1,119 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Asscat Demo OS</title>
+<style>
+  :root {
+    --bg: #f6f6f4; --panel: #ffffff; --line: #d9d9d4; --text: #1d1d1b; --muted: #6b6b66;
+    --accent: #2457c5; --sel: #dbe6ff; --err: #b3261e; --term-bg: #16181d; --term-text: #e4e6eb; --term-muted: #8a909c; --term-accent: #7fb0ff;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #121316; --panel: #1b1d22; --line: #30333a; --text: #e6e7ea; --muted: #9a9ea8;
+      --accent: #7fb0ff; --sel: #26365a; --err: #ff8a80; --term-bg: #0d0e11; --term-text: #e4e6eb; --term-muted: #8a909c; --term-accent: #7fb0ff;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #121316; --panel: #1b1d22; --line: #30333a; --text: #e6e7ea; --muted: #9a9ea8;
+    --accent: #7fb0ff; --sel: #26365a; --err: #ff8a80; --term-bg: #0d0e11; --term-text: #e4e6eb; --term-muted: #8a909c; --term-accent: #7fb0ff;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; }
+  body { background: var(--bg); color: var(--text); font: 13px/1.4 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; display: flex; flex-direction: column; }
+  header { display: flex; gap: 12px; align-items: center; padding: 6px 12px; border-bottom: 1px solid var(--line); flex-wrap: wrap; }
+  header b { font-size: 14px; }
+  header .sp { flex: 1; }
+  header .clock { color: var(--muted); font-variant-numeric: tabular-nums; }
+  button { font: inherit; color: var(--text); background: var(--panel); border: 1px solid var(--line); border-radius: 5px; padding: 2px 8px; cursor: pointer; }
+  button:hover { border-color: var(--accent); }
+  main { flex: 1; display: flex; min-height: 0; }
+  #term { flex: 1.2; min-width: 0; background: var(--term-bg); color: var(--term-text); display: flex; flex-direction: column; font: 12.5px/1.45 ui-monospace, SFMono-Regular, Menlo, monospace; }
+  #out { flex: 1; overflow: auto; padding: 10px 12px; white-space: pre-wrap; word-break: break-word; }
+  #out .cmd { color: var(--term-accent); }
+  #out .err { color: var(--term-muted); }
+  #out .note { color: #e5c07b; }
+  #inrow { display: flex; gap: 6px; padding: 6px 12px 8px; border-top: 1px solid #2a2d35; align-items: center; }
+  #prompt { color: var(--term-accent); white-space: nowrap; }
+  #in { flex: 1; background: transparent; color: inherit; border: 0; outline: 0; font: inherit; min-width: 0; }
+  #next { color: #e5c07b; padding: 0 12px 6px; display: none; white-space: pre-wrap; }
+  #finder { flex: 1; min-width: 0; display: flex; border-left: 1px solid var(--line); background: var(--panel); }
+  #side { width: 150px; border-right: 1px solid var(--line); padding: 8px; overflow: auto; flex-shrink: 0; }
+  #side h4 { margin: 8px 0 4px; font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; }
+  #side .it { padding: 2px 6px; border-radius: 4px; cursor: pointer; display: flex; justify-content: space-between; gap: 4px; }
+  #side .it:hover, #side .it.drop { background: var(--sel); }
+  #side .ej { color: var(--muted); }
+  #fmain { flex: 1; display: flex; flex-direction: column; min-width: 0; }
+  #ftool { display: flex; flex-wrap: wrap; gap: 4px; padding: 6px; border-bottom: 1px solid var(--line); align-items: center; }
+  #fpath { flex: 1 1 100%; font: 12px ui-monospace, Menlo, monospace; padding: 3px 6px; border: 1px solid var(--line); border-radius: 4px; background: var(--bg); color: var(--text); }
+  #flist { flex: 1; overflow: auto; }
+  table { width: 100%; border-collapse: collapse; }
+  th { text-align: left; font-weight: 500; color: var(--muted); font-size: 11px; padding: 4px 8px; border-bottom: 1px solid var(--line); position: sticky; top: 0; background: var(--panel); }
+  td { padding: 3px 8px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 260px; }
+  tr.row { cursor: default; user-select: none; }
+  tr.row:hover td { background: color-mix(in srgb, var(--sel) 50%, transparent); }
+  tr.row.sel td { background: var(--sel); }
+  tr.row.drop td { outline: 2px solid var(--accent); outline-offset: -2px; }
+  td.num { text-align: right; font-variant-numeric: tabular-nums; color: var(--muted); }
+  td.dim { color: var(--muted); font-variant-numeric: tabular-nums; }
+  #fstat { padding: 4px 8px; border-top: 1px solid var(--line); color: var(--muted); min-height: 24px; }
+  #fstat.bad { color: var(--err); }
+  dialog { border: 1px solid var(--line); border-radius: 8px; background: var(--panel); color: var(--text); width: min(640px, 92vw); }
+  dialog textarea { width: 100%; height: 50vh; font: 12px ui-monospace, Menlo, monospace; background: var(--bg); color: var(--text); border: 1px solid var(--line); }
+  @media (max-width: 760px) { main { flex-direction: column; } #finder { border-left: 0; border-top: 1px solid var(--line); min-height: 45vh; } #side { width: 110px; } }
+</style>
+</head>
+<body>
+<header>
+  <b>Asscat demo · mock OS</b>
+  <span class="clock" id="clock"></span>
+  <span class="sp"></span>
+  <button id="bDemo" title="Start the first walkthrough">▶ demo tour</button>
+  <button id="bTest" title="Run the 22 acceptance scenarios from the spec">selftest</button>
+  <button id="bReset" title="Erase all mock disks and start over">reset</button>
+</header>
+<main>
+  <section id="term">
+    <div id="out"></div>
+    <div id="next"></div>
+    <div id="inrow"><span id="prompt"></span><input id="in" autocomplete="off" spellcheck="false" autofocus></div>
+  </section>
+  <section id="finder">
+    <nav id="side"></nav>
+    <div id="fmain">
+      <div id="ftool">
+        <button data-a="up" title="Enclosing folder">↑</button>
+        <button data-a="mkdir">New folder</button>
+        <button data-a="newfile">New file</button>
+        <button data-a="edit" title="Open the file in a text editor; saving overwrites it (new mtime)">Edit</button>
+        <button data-a="rename">Rename</button>
+        <button data-a="cut">Cut</button>
+        <button data-a="copy">Copy</button>
+        <button data-a="paste">Paste</button>
+        <button data-a="delete">Delete</button>
+        <button data-a="date" title="Set modification time">Set date</button>
+        <button data-a="term" title="cd the terminal here">⌨ here</button>
+        <label><input type="checkbox" id="hidden"> hidden</label>
+        <input id="fpath" spellcheck="false">
+      </div>
+      <div id="flist"></div>
+      <div id="fstat"></div>
+    </div>
+  </section>
+</main>
+<dialog id="dlg"><form method="dialog">
+  <div id="dlgTitle" style="margin-bottom:6px;font-weight:600"></div>
+  <textarea id="dlgText" spellcheck="false"></textarea>
+  <div style="display:flex;gap:6px;justify-content:flex-end;margin-top:6px"><button value="cancel">Cancel</button><button value="save" id="dlgSave">Save</button></div>
+</form></dialog>
+<script src="src/util.js"></script>
+<script src="src/os.js"></script>
+<script src="src/gen.js"></script>
+<script src="src/asscat.js"></script>
+<script src="src/selftest.js"></script>
+<script src="src/shell.js"></script>
+<script src="src/demos.js"></script>
+<script src="src/ui.js"></script>
+</body>
+</html>
