@@ -39,13 +39,28 @@
       askYes('Erase all mock disks and the library and start over?', 'Erase').then(yes => {
         if (!yes) return print('reset cancelled', 'err');
         try { localStorage.removeItem(KEY); } catch { /* blocked */ }
-        k.listeners = []; boot(true); out.textContent = ''; welcome(); render();
+        k.listeners = []; boot(true); out.textContent = ''; welcome(); render(); if (gui) gui.refresh();
       });
       return;
     }
-    if (t) { const code = sh.exec(line); if (code) print(`[exit ${code}]`, 'err'); }
+    if (t) { const code = sh.exec(line); if (code) print(`[exit ${code}]`, 'err'); consoleUsed = true; }
     save(); render();
   }
+  // the GUI's only way into the app: run a command line in the shell and echo it to the console
+  let consoleUsed = false;
+  function guiRun(line) {
+    print(`[gui] ${sh.prompt()} ${line}`, 'cmd gui');
+    const outL = [], errL = [], o = sh.out, e = sh.err;
+    sh.out = s => outL.push(s); sh.err = s => errL.push(s);
+    let code; try { code = sh.exec(line); } finally { sh.out = o; sh.err = e; }
+    const text = outL.join('\n'), lines = text.split('\n'), MAX = 25;
+    if (text) print(lines.length > MAX ? lines.slice(0, MAX).join('\n') + `\n… ${lines.length - MAX} more lines` : text);
+    errL.forEach(x => print(x, 'err')); if (code) print(`[exit ${code}]`, 'err');
+    save(); render();
+    let json = null; try { json = JSON.parse(text); } catch { /* not JSON */ }
+    return { code, text, json };
+  }
+  const guiCli = argv => guiRun(['asscat', ...argv.map(a => window.Builder.quote(a))].join(' '));
   function stepDemo() {
     while (sh.queue.length && sh.queue[0].startsWith('#')) print(sh.queue.shift(), 'note');
     if (sh.queue.length) runLine(sh.queue.shift());
@@ -249,13 +264,25 @@
   }
   setInterval(() => { $('clock').textContent = `${U.fmtLocal(k.now(), k.tzMin, false)} UTC${U.tzString(k.tzMin)} · ${k.hostname}`; }, 1000);
 
-  $('bDemo').onclick = () => { runLine('demo tour'); input.focus(); };
-  $('bTest').onclick = () => { runLine('selftest'); input.focus(); };
+  // layout: App / App + console / Console
+  function setMode(m) {
+    document.body.classList.remove('mode-app', 'mode-both', 'mode-console');
+    document.body.classList.add('mode-' + m);
+    for (const [id, mm] of [['mApp', 'app'], ['mBoth', 'both'], ['mCon', 'console']]) $(id).classList.toggle('on', mm === m);
+    try { localStorage.setItem(KEY + '-mode', m); } catch { /* blocked */ }
+    if (m !== 'console' && consoleUsed && gui) { consoleUsed = false; gui.refresh(); }
+    if (m === 'console') input.focus();
+    out.scrollTop = out.scrollHeight;
+  }
+  $('mApp').onclick = () => setMode('app'); $('mBoth').onclick = () => setMode('both'); $('mCon').onclick = () => setMode('console');
+  $('bDemo').onclick = () => { if (document.body.classList.contains('mode-app')) setMode('both'); runLine('demo tour'); input.focus(); };
+  $('bTest').onclick = () => { if (document.body.classList.contains('mode-app')) setMode('both'); runLine('selftest'); input.focus(); };
   $('bReset').onclick = () => runLine('reset');
 
   function welcome() {
     print('Asscat demo on a mock unix-like OS. Nothing here touches your real disk; state lives in this browser tab (localStorage).', 'note');
     print('Type "help" for shell commands, "asscat help" for the app, "demo" for guided walkthroughs (run them in order), "selftest" for the spec\'s 22 acceptance tests.', 'note');
+    print('The app window (above, "App" in the header) uses nothing but these CLI commands; its calls show up here marked [gui].', 'note');
     print('Below the output is a command builder: pick a command, fill the fields, Run. It sends exactly the line shown, same as typing it.', 'note');
     print('The right pane is an independent file browser: drag rows onto folders to move, double-click a file to edit it, plug in disks in the sidebar.', 'note');
   }
@@ -268,4 +295,8 @@
   welcome();
   if (restored) print('(restored previous state — "reset" to start over)', 'err');
   render();
+  let gui = null;
+  let mode = 'app'; try { mode = localStorage.getItem(KEY + '-mode') || 'app'; } catch { /* blocked */ }
+  setMode(mode);
+  gui = window.Gui.mount($('app'), { cli: guiCli, raw: guiRun });
 })();

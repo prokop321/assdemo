@@ -6,7 +6,10 @@ simulated unix-like OS instead of a real Mac. No real files are touched.
 **Run:** open `index.html` in a browser (works from `file://`, no server, no build), or use the single
 file `dist/asscat-demo.html` (`node build.js` regenerates it, plus `dist/artifact.html` for claude.ai).
 
-- left: terminal (`help`, `asscat help`, `demo`, `selftest`), Tab completion, ↑/↓ history
+- left: a minimal asscat GUI (files and tags, views and materialize, card import and shoots, settings).
+  It does everything through `asscat …` command lines run in the shell. Switch the header to
+  **App + console** to see every call it makes (marked `[gui]`) with its output
+- console: terminal (`help`, `asscat help`, `demo`, `selftest`), Tab completion, ↑/↓ history
 - under it: a command builder. Pick a command, fill its fields (paths, tag keys/values, views and disks
   are suggested), and **Run** sends exactly the command line shown, as if typed. "↓ to prompt" copies it
   into the text prompt for hand editing
@@ -27,6 +30,7 @@ in the browser). `node tests/demos.js [name]` prints a transcript of the guided 
 | `src/shell.js` | shell: `ls cd tree mv cp rm mkdir touch chmod ln cat stat find`, `disk`, `clock`, `tz`, `holdlock`, `genphotos`… |
 | `src/demos.js` | six guided walkthroughs (`demo tour`, `edits`, `card`, `views`, `crash`, `limits`; run in that order) |
 | `src/selftest.js` | the spec's acceptance tests |
+| `src/gui.js` | the GUI; its only access to the app is `ctx.cli([...])`, i.e. a command line |
 | `src/builder.js` | command builder: catalogue of commands and their parameters, quoting |
 | `src/ui.js`, `index.html` | browser UI |
 
